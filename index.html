@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>合欣包裝進度</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky header with tabs; each tab is one working view (orders / log / day sheet / schedule / materials) */
+:root{
+  --bg:#F3F5F4; --panel:#FFFFFF; --ink:#18221F; --muted:#5B6A65; --line:#D9E0DD; --soft:#E9EEEC;
+  --accent:#1F6F8B; --accent-ink:#FFFFFF; --accent-soft:#DCEBF1;
+  --ok:#2F7D4F; --ok-soft:#DFF0E5; --warn:#A86A12; --warn-soft:#F7EBD5; --bad:#B23A2E; --bad-soft:#F6DEDA;
+  --lathe:#7A4FA0; --lathe-soft:#ECE3F4;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111816; --panel:#18211E; --ink:#E6ECE9; --muted:#97A6A1; --line:#2A3632; --soft:#202B28;
+  --accent:#5DB3D1; --accent-ink:#0B1A20; --accent-soft:#18323C;
+  --ok:#6CC08C; --ok-soft:#1A3326; --warn:#E0A64A; --warn-soft:#3A2C14; --bad:#EE7B6E; --bad-soft:#3D1F1B;
+  --lathe:#B993DA; --lathe-soft:#2E2338; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111816; --panel:#18211E; --ink:#E6ECE9; --muted:#97A6A1; --line:#2A3632; --soft:#202B28;
+  --accent:#5DB3D1; --accent-ink:#0B1A20; --accent-soft:#18323C;
+  --ok:#6CC08C; --ok-soft:#1A3326; --warn:#E0A64A; --warn-soft:#3A2C14; --bad:#EE7B6E; --bad-soft:#3D1F1B;
+  --lathe:#B993DA; --lathe-soft:#2E2338; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-block:12px 4px}
+h1{font-size:19px;font-weight:700;margin:0;letter-spacing:.02em}
+.asof{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.asof label{white-space:nowrap}
+.asof input{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.sync{font-size:12px;color:var(--muted)}
+.auth{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.auth input{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:130px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#authOff,#authOn{display:inline-flex;align-items:center;gap:6px}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav button{font:inherit;font-size:14px;background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+nav button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:20px 48px}
+section[role=tabpanel]{display:flex;flex-direction:column;gap:20px}
+h2{font-size:16px;margin:0;font-weight:700}
+.note{color:var(--muted);font-size:13px;margin:0;max-width:72ch}
+.banner{background:var(--warn-soft);color:var(--ink);border:1px solid var(--warn);border-radius:8px;padding:10px 14px;font-size:14px}
+.banner.info{background:var(--accent-soft);border-color:var(--accent)}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+/* order cards */
+.orders{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.ord{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ord-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ord-h b{font-size:17px}
+.cust{font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;margin-left:auto}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)} .chip.done{background:var(--accent-soft);color:var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:13.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.bar{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.delta{font-size:12px;color:var(--muted)}
+.delta.late{color:var(--bad)} .delta.early{color:var(--ok)}
+details.items summary{cursor:pointer;font-size:13px;color:var(--accent)}
+/* tables */
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:500;background:var(--soft);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+tr.lathe td{background:var(--lathe-soft)}
+tr.over td{background:var(--bad-soft)}
+tr.void td{color:var(--muted);text-decoration:line-through}tr.void td:last-child{text-decoration:none}
+tr.editing input,tr.editing select{font-size:13px;padding:3px 6px;width:auto}
+.tag{font-size:11.5px;padding:1px 7px;border-radius:4px;background:var(--soft);color:var(--muted)}
+.tag.lathe{background:var(--lathe-soft);color:var(--lathe)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)} .tag.warn{background:var(--warn-soft);color:var(--warn)} .tag.ok{background:var(--ok-soft);color:var(--ok)}
+/* forms */
+form.entry{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;align-items:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+select,input[type=number],input[type=date]{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
+td select{font-size:13px;padding:3px 6px;width:auto}
+.btn{font:inherit;font-size:14px;font-weight:700;border:0;border-radius:7px;padding:9px 16px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);font-weight:500;padding:4px 10px;font-size:13px}
+.btn.danger{background:var(--bad);color:#fff;padding:4px 10px;font-size:13px}
+.hint{grid-column:1/-1;font-size:13px;color:var(--muted);min-height:1.2em}
+.hint.err{color:var(--bad)}
+.mv{display:inline-flex;gap:4px;margin-left:4px}.mv .btn{padding:2px 8px}.btn.ghost:disabled{opacity:.35}
+.hint .btn{margin-left:8px}
+.pc{display:flex;align-items:center;gap:8px;min-width:120px}.pc .bar{flex:1;min-width:60px}.pc span{font-size:12.5px}
+span.neg{color:var(--bad)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.person{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.person h3{margin:0;font-size:15px;display:flex;gap:8px;align-items:baseline}
+.person ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.person li{display:flex;gap:8px;justify-content:space-between;font-size:13.5px;border-top:1px dashed var(--line);padding-top:6px}
+.person li:first-child{border-top:0;padding-top:0}
+.empty{color:var(--muted);font-size:13.5px}
+.loads{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.load{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.load b{display:block;font-size:14px}
+.vsum{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.vt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.vt span{font-size:12.5px;color:var(--muted)}
+.vt b{font-size:22px;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.vt b.pos{color:var(--ok)} .vt b.neg{color:var(--bad)}
+.vt small{font-size:12.5px;color:var(--muted)}
+td.pos{color:var(--ok)} td.neg{color:var(--bad)}
+.dvh{text-align:center}
+.dv{position:relative;width:160px;height:12px;margin:0 auto}
+.dv::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.dv i{position:absolute;top:2px;height:8px;border-radius:2px}
+.dv i.pos{left:50%;background:var(--ok)} .dv i.neg{right:50%;background:var(--bad)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="app">
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>合欣包裝進度</h1>
+      <div class="asof"><label for="asof" style="flex-direction:row;align-items:center;gap:6px;color:inherit;font-size:13px">進度記到<input type="date" id="asof"></label><span id="asofNote"></span></div>
+      <span class="auth" id="authBox">
+        <span id="authOff"><label for="passIn" class="sr">通關密碼</label><input type="password" id="passIn" placeholder="輸入密碼以編輯" autocomplete="current-password"><button class="btn ghost" id="passBtn" type="button">解鎖</button></span>
+        <span id="authOn" hidden>可編輯・<label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:90px"> <button class="btn ghost" id="lockBtn" type="button">鎖定</button></span>
+      </span>
+      <span class="sync" id="sync">連線中…</span>
+    </div>
+    <nav role="tablist" id="tabs">
+      <button role="tab" id="t-ov" aria-selected="true" data-p="ov">各單狀況</button>
+      <button role="tab" id="t-var" aria-selected="false" data-p="var">進度比較</button>
+      <button role="tab" id="t-log" aria-selected="false" data-p="log">記錄進度</button>
+      <button role="tab" id="t-day" aria-selected="false" data-p="day">每日工作</button>
+      <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
+      <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <div id="loadErr" class="banner" hidden></div>
+
+  <section role="tabpanel" id="p-ov">
+    <div id="ovBanner"></div>
+    <div class="orders" id="orders"></div>
+    <h2>人力負荷（剩餘工作）</h2>
+    <div class="loads" id="loads"></div>
+    <p class="note">完成日依「記錄進度」裡的實際包裝數量重新推算：已包的數量從排程扣掉，剩下的照原本分工（芳、智、幫手各包不同品號）往後排。包完期限＝出貨日前一個工作天 17:00。新豐品號由新豐自行包裝，不在此列。</p>
+  </section>
+
+  <section role="tabpanel" id="p-var" hidden>
+    <p class="note" id="varHead"></p>
+    <div class="vsum" id="varSum"></div>
+    <h2>人員</h2>
+    <div class="tbl"><table><thead><tr><th>人員</th><th class="r">原排程應做(人天)</th><th class="r">實際做了(人天)</th><th class="r">差異(人天)</th><th class="dvh">落後 ← → 超前</th><th>狀態</th></tr></thead><tbody id="varWho"></tbody></table></div>
+    <h2>訂單</h2>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">原排程應包(PCS)</th><th class="r">實際已包(PCS)</th><th class="r">差異(PCS)</th><th class="r">差異(人天)</th><th class="dvh">落後 ← → 超前</th><th>預計包完</th></tr></thead><tbody id="varOrd"></tbody></table></div>
+    <h2>品號</h2>
+    <div class="tbl"><table><thead><tr><th>狀態</th><th>訂單</th><th>品號</th><th class="r">原排程應包</th><th class="r">實際已包</th><th class="r">差異(PCS)</th><th class="r">差異(人天)</th></tr></thead><tbody id="varItem"></tbody></table></div>
+    <h2>車台 FG1E</h2>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">原排程應做(顆)</th><th class="r">實際做了(顆)</th><th class="r">差異(顆)</th><th class="r">差異(天)</th><th>狀態</th></tr></thead><tbody id="varLathe"></tbody></table></div>
+    <p class="note">比較基準是 10/18 重排的排程（1475608061 依原始訂單，04-6825、04-9317、04-9326 全數未包）：截至「進度記到」那天收工，原排程每人、每品號應該完成多少，和「記錄進度」裡實際輸入的數量相比。差異換算成人天：用各品號的包裝工時（吊入 1,300、袋入 3,400、卡入 5,100 PCS/人天，含裝箱）計算，車台以 14,000 顆/天計算。一個人的差異人天，大約就是他超前或落後幾個工作天。誰包的照記錄上的人員算，改派不影響原排程的基準。</p>
+  </section>
+
+  <section role="tabpanel" id="p-log" hidden>
+    <form class="entry" id="entryForm" autocomplete="off">
+      <label for="fDate">日期<input type="date" id="fDate" required></label>
+      <label for="fWho">人員<select id="fWho"></select></label>
+      <label for="fKind">工作<select id="fKind"><option value="pack">包裝</option><option value="lathe">車台 FG1E</option></select></label>
+      <label for="fOrder">訂單<select id="fOrder"></select></label>
+      <label for="fItem">品號<select id="fItem"></select></label>
+      <label for="fQty">數量（PCS／顆）<input type="number" id="fQty" min="1" step="1" inputmode="numeric" required></label>
+      <button class="btn" id="fSave" type="submit">記錄</button>
+      <p class="hint" id="fHint"></p>
+    </form>
+    <div class="row" style="justify-content:space-between"><h2>所有記錄 <span class="cust" id="entCount"></span></h2><button class="btn ghost" id="backup" type="button" hidden>下載備份（CSV）</button></div>
+    <p class="note">記錄不會被刪除。「作廢」只是不計入排程，隨時可以復原；「更正」會保留修改前的數值。網站程式更新時不會改動這些記錄。</p>
+    <div class="tbl"><table><thead><tr><th>日期</th><th>人員</th><th>工作</th><th>訂單</th><th>品號</th><th class="r">數量</th><th class="r">累計 / 訂單數量</th><th>完成</th><th>記錄者</th><th></th></tr></thead><tbody id="entries"></tbody></table></div>
+  </section>
+
+  <section role="tabpanel" id="p-day" hidden>
+    <div class="row"><label for="dayPick" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">日期<input type="date" id="dayPick" style="width:auto"></label><button class="btn ghost" id="dayPrev" type="button">前一天</button><button class="btn ghost" id="dayNext" type="button">後一天</button></div>
+    <div class="people" id="dayPeople"></div>
+    <p class="note">每人當天預計的品號、工時與數量（數量依工時比例估算，取整到 10）。這是重新推算後的排程，不是原始版。</p>
+  </section>
+
+  <section role="tabpanel" id="p-sch" hidden>
+    <div class="row">
+      <label for="schWho" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">人員<select id="schWho" style="width:auto"><option value="">全部</option></select></label>
+      <label for="schOrder" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">訂單<select id="schOrder" style="width:auto"><option value="">全部</option></select></label>
+      <button class="btn ghost" id="resetOv" type="button" hidden>還原所有改派與順序</button>
+    </div>
+    <p class="note">「順序」是這段工作在該人員手上的第幾段；「置頂」把它排到那個人最前面，↑↓ 前後移一段。「改派」可以把一段包裝工作換給另一個人，例如請智多包一點、取代某位幫手。芳的車台不能改派或移動，車台也不會早於原定時間開始。含 FG1E 的品號移到前面，仍要等燈泡做完才開包。紅色列＝超出該幫手的上工期間，或晚於包完期限。</p>
+    <div class="tbl"><table><thead><tr><th>人員</th><th>工作</th><th>訂單</th><th>品號(分段)</th><th class="r">剩餘數量</th><th class="r">剩餘人天</th><th>開始</th><th>結束</th><th>比原排程</th><th>順序</th><th>改派</th></tr></thead><tbody id="sch"></tbody></table></div>
+  </section>
+
+  <section role="tabpanel" id="p-mat" hidden>
+    <p class="note">料齊期限＝該品號依目前排程第一天開包的前一個工作天。已開始包裝的品號視為料已到。勾選「已到料」會存到試算表，所有人都看得到。</p>
+    <div class="tbl"><table><thead><tr><th>狀態</th><th>料齊期限</th><th>開包日</th><th>訂單</th><th>品號</th><th class="r">數量</th><th>已到料</th></tr></thead><tbody id="mat"></tbody></table></div>
+  </section>
+</main>
+</div>
+
+<script src="config.js"></script>
+<script>
+(() => {
+const WK='日一二三四五六';
+const PEOPLE=['芳','智','幫手1','幫手2','幫手3'];
+const START={'智':'2026-10-19'};
+const WID={'芳':'fang','智':'zhi','幫手1':'h1','幫手2':'h2','幫手3':'h3'};
+const docIdOf=tid=>{const i=tid.lastIndexOf('-');return WID[tid.slice(0,i)]+'-'+tid.slice(i+1)};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let P=null, DAYS=[], IDX={};
+let allEntries=[], editingId=null, dl=null;
+let entries=[], overrides={}, seqs={}, materials={}, db=null, user=null, myId=null, canWrite=false, profiles={};
+let asofManual=null, dayPick=null;
+
+/* ---------- calendar ---------- */
+const dow=iso=>new Date(iso+'T00:00:00Z').getUTCDay();
+const addD=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+function buildDays(){const hol=new Set(P.holidays);let d='2026-10-01';while(d<'2027-12-31'){const w=dow(d);if(w>0&&w<6&&!hol.has(d)){IDX[d]=DAYS.length;DAYS.push(d)}d=addD(d,1)}}
+const isWd=iso=>iso in IDX;
+const nextWd=iso=>{let d=addD(iso,1);while(!isWd(d))d=addD(d,1);return d};
+const prevWd=iso=>{let d=addD(iso,-1);while(!isWd(d))d=addD(d,-1);return d};
+function toM(s){let [d,t]=s.split('T');let mins=t?(+t.slice(0,2))*60+(+t.slice(3,5)):480;
+  if(!isWd(d)){while(!isWd(d))d=addD(d,1);mins=480}
+  const off=mins<=480?0:mins<=720?mins-480:mins<=780?240:mins<=1020?240+mins-780:480;return IDX[d]*480+off}
+function toT(m,end){m=Math.round(m);let i=Math.floor(m/480),off=m-i*480;if(end&&off===0&&i>0){i--;off=480}
+  const mins=(off<240||(end&&off===240))?480+off:780+off-240;return{d:DAYS[i],hh:String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')}}
+const fd=iso=>{const[y,m,d]=iso.split('-');return `${+m}/${+d}(${WK[dow(iso)]})`};
+const fdy=iso=>{const[y,m,d]=iso.split('-');return `${y}/${+m}/${+d}(${WK[dow(iso)]})`};
+const ft=(m,end)=>{const t=toT(m,end);return `${fd(t.d)} ${t.hh}`};
+const dayEnd=iso=>IDX[iso]*480+480;
+function wdBetween(a,b){/* workdays in (a,b] */let n=0;for(const d of DAYS){if(d>a&&d<=b)n++;if(d>b)break}return n}
+const today=()=>{const n=new Date(Date.now()+8*3600e3);return n.toISOString().slice(0,10)};
+const fmtN=n=>Math.round(n).toLocaleString('en-US');
+
+/* ---------- scheduling ---------- */
+const orderOf=id=>P.orders.find(o=>o.id===id);
+const ORDSEQ=()=>P.orders.map(o=>o.id);
+const needsFG1E=(o,it)=>{const oid=String(o);if(oid.startsWith('147'))return['04-1411','04-6637','04-6665','04-6666','04-9326'].includes(it);return it.includes('FG1E')};
+function asofDate(){if(asofManual)return asofManual;const ds=entries.map(e=>e.date).filter(Boolean).sort();return ds.length?ds[ds.length-1]:'2026-10-15'}
+function doneMaps(){const pack={},lathe={};for(const e of entries){const q=+e.qty||0;if(e.kind==='lathe')lathe[e.order]=(lathe[e.order]||0)+q;else{const k=e.order+'|'+e.item;pack[k]=(pack[k]||0)+q}}return{pack,lathe}}
+function simulate(){
+  const asof=asofDate();
+  const planStart=toM('2026-10-16T08:00');
+  const simStart=Math.max(planStart,IDX[nextWd(asof)]*480);
+  const {pack,lathe}=doneMaps();
+  const left={...pack},leftL={...lathe};
+  const tasks=P.tasks.slice().sort((a,b)=>a.s<b.s?-1:a.s>b.s?1:0).map(t=>{
+    let rem=t.qty;
+    if(t.kind==='lathe'){const u=Math.min(rem,leftL[t.order]||0);leftL[t.order]=(leftL[t.order]||0)-u;rem-=u}
+    else{const k=t.order+'|'+t.item;const u=Math.min(rem,left[k]||0);left[k]=(left[k]||0)-u;rem-=u}
+    const w=t.kind==='pack'&&overrides[t.id]?overrides[t.id]:t.w;
+    return{...t,w,orig:t.w,rem,work:t.pd*480*rem/t.qty,ps:toM(t.s),pe:toM(t.e)}});
+  const CHG=P.rates.chg;
+  // 芳 works through her list in plan order. A 車台 batch never starts before its planned time.
+  // A batch that interrupted her packing in the plan (10/19–10/23) is a fixed block her packing works around.
+  const ready={},planReady={},blocks=[];
+  for(const t of P.tasks)if(t.kind==='lathe')planReady[t.order]=Math.max(planReady[t.order]||0,toM(t.e));
+  const fangPlan=P.tasks.filter(t=>t.w==='芳').sort((a,b)=>a.s<b.s?-1:1);
+  const preempt=new Set();fangPlan.forEach((t,i)=>{if(t.kind==='lathe'&&t.fixed)preempt.add(t.id);else if(t.kind==='lathe'&&fangPlan.slice(0,i).some(p=>p.kind==='pack'&&toM(p.e)>toM(t.s)+1))preempt.add(t.id)});
+  for(const t of tasks)if(t.kind==='lathe'&&preempt.has(t.id)&&t.rem>0){const st=Math.max(t.ps,simStart);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];blocks.push([st,t.en]);ready[t.order]=Math.max(ready[t.order]||0,t.en)}
+  // FG1E gate: only for segments the plan itself held until the bulbs were done (some used stock on hand)
+  const gate=t=>needsFG1E(t.order,t.item)&&t.ps>=(planReady[t.order]||0)-1?(ready[t.order]??0):0;
+  // place `work` minutes from `st`, skipping 車台 blocks for 芳
+  const place=(st,work,useBlocks)=>{const pieces=[];let cur=st;
+    if(useBlocks){for(;;){const b=blocks.find(b=>cur>=b[0]-1e-6&&cur<b[1]);if(!b)break;cur=b[1]+(b[1]%480<1e-6?0:CHG)}}
+    let left=work;
+    while(left>1e-6){const nb=useBlocks?blocks.filter(b=>b[0]>cur+1e-6).sort((a,b)=>a[0]-b[0])[0]:null;
+      const avail=nb?nb[0]-cur:Infinity;
+      if(left<=avail){pieces.push([cur,cur+left]);cur+=left;left=0}
+      else{if(avail>0)pieces.push([cur,nb[0]]);left-=Math.max(0,avail);cur=nb[1]+(nb[1]%480<1e-6?0:CHG)}}
+    return pieces.length?pieces:[[st,st]]};
+  const free={},had={};
+  for(const w of PEOPLE){const win=P.helpers[w];const s0=win?win[0]:(START[w]||'2026-10-16');free[w]=Math.max(simStart,IDX[s0]*480)}
+  const lastKind={};const gap=(w,t)=>had[w]&&free[w]%480>1e-6&&!(lastKind[w]==='lathe'&&t.kind==='lathe')?CHG:0;
+  const queue={};
+  const orderQ=(list,w)=>{const sq=seqs[w];if(!sq||!sq.length)return list;const pos=new Map(sq.map((id,i)=>[id,i]));
+    const inSeq=list.filter(t=>pos.has(t.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let j=0;return list.map(t=>pos.has(t.id)?inSeq[j++]:t)};
+  for(const w of PEOPLE){const q=orderQ(tasks.filter(t=>t.w===w&&t.rem>0&&!preempt.has(t.id)),w);queue[w]=q.map(t=>t.id);q.forEach((t,i)=>t.pos=i+1);for(const t of q){
+    if(t.kind==='lathe'){const st=Math.max(free[w]+gap(w,t),t.ps);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';ready[t.order]=Math.max(ready[t.order]||0,t.en);continue}
+    const st=Math.max(free[w]+gap(w,t),gate(t));lastKind[w]='pack';
+    t.pieces=place(st,t.work,w==='芳');t.st=t.pieces[0][0];t.en=t.pieces[t.pieces.length-1][1];free[w]=t.en;had[w]=true}}
+  // per-day breakdown
+  const daily={};
+  for(const t of tasks){if(!(t.rem>0))continue;const tot=t.pieces.reduce((s,p)=>s+p[1]-p[0],0);
+    for(const [a,b] of t.pieces){let m=a;while(m<b-1e-6){const di=Math.floor(m/480);const e=Math.min(b,(di+1)*480);const d=DAYS[di];
+      (daily[d]=daily[d]||[]).push({t,mins:e-m,q:tot>0?t.rem*(e-m)/tot:t.rem});m=e}}}
+  // order + item results
+  const ord={};
+  for(const o of P.orders){const its=P.items.filter(i=>i.order===o.id&&i.loc==='合欣');
+    const total=its.reduce((s,i)=>s+i.qty,0);const done=its.reduce((s,i)=>s+Math.min(i.qty,pack[o.id+'|'+i.item]||0),0);
+    const rest=tasks.filter(t=>t.order===o.id&&t.kind==='pack'&&t.rem>0);
+    const fin=rest.length?Math.max(...rest.map(t=>t.en)):null;
+    const planFin=Math.max(...P.tasks.filter(t=>t.order===o.id&&t.kind==='pack').map(t=>toM(t.e)));
+    const dueM=dayEnd(o.due);
+    let buf=null;if(fin!=null){const fd_=toT(fin,true).d;buf=fin<=dueM+1e-6?wdBetween(fd_,o.due):-wdBetween(o.due,fd_)}
+    const lt=tasks.filter(t=>t.order===o.id&&t.kind==='lathe');
+    const fg=lt.some(t=>t.rem>0)?Math.max(...lt.filter(t=>t.rem>0).map(t=>t.en)):null;
+    ord[o.id]={total,done,fin,planFin,buf,fg,its}}
+  const item={};
+  for(const t of tasks){if(t.kind!=='pack')continue;const k=t.order+'|'+t.item;const r=item[k]=item[k]||{first:null,last:null,rem:0};
+    if(t.rem>0){r.first=r.first==null?t.st:Math.min(r.first,t.st);r.last=r.last==null?t.en:Math.max(r.last,t.en);r.rem+=t.rem}}
+  return{asof,simStart,tasks,daily,ord,item,pack,lathe,free,queue}}
+
+/* ---------- render ---------- */
+let S=null,BASE=null;
+function baseline(){if(BASE)return BASE;const sv=[entries,overrides,asofManual];entries=[];overrides={};asofManual=null;try{BASE=simulate()}finally{[entries,overrides,asofManual]=sv}return BASE}
+function pdPer(){const m={};for(const t of P.tasks){const k=t.kind==='lathe'?'L|'+t.order:t.order+'|'+t.item;const r=m[k]=m[k]||{pd:0,q:0};r.pd+=t.pd;r.q+=t.qty}const o={};for(const k in m)o[k]=m[k].pd/m[k].q;return o}
+function variance(){
+  const D=asofDate(),B=baseline(),per=pdPer(),LR=P.rates.lathe;
+  const plan={item:{},who:{},lathe:{}},act={item:{},who:{},lathe:{}};
+  for(const d in B.daily){if(d>D)continue;for(const x of B.daily[d]){const t=x.t;
+    plan.who[t.orig]=(plan.who[t.orig]||0)+x.mins/480;
+    if(t.kind==='lathe')plan.lathe[t.order]=(plan.lathe[t.order]||0)+x.q;else{const k=t.order+'|'+t.item;plan.item[k]=(plan.item[k]||0)+x.q}}}
+  let n=0;for(const e of entries){if(!e.date||e.date>D)continue;n++;const q=+e.qty||0;
+    if(e.kind==='lathe'){act.lathe[e.order]=(act.lathe[e.order]||0)+q;act.who[e.who]=(act.who[e.who]||0)+q*(per['L|'+e.order]||1/LR)}
+    else{const k=e.order+'|'+e.item;act.item[k]=(act.item[k]||0)+q;act.who[e.who]=(act.who[e.who]||0)+q*(per[k]||0)}}
+  return{D,per,plan,act,n,LR}}
+const sgn=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d);
+const sgnN=v=>(v>0?'+':v<0?'−':'')+fmtN(Math.abs(v));
+const cls=(v,eps)=>v>eps?'pos':v<-eps?'neg':'';
+function stat(v,eps,unit){if(Math.abs(v)<=eps)return'<span class="tag">符合</span>';return v>0?`<span class="tag ok">超前 ${Math.abs(v).toFixed(1)}${unit}</span>`:`<span class="tag ${v<-1?'bad':'warn'}">落後 ${Math.abs(v).toFixed(1)}${unit}</span>`}
+const dvBar=(v,max)=>{const w=max>0?Math.min(50,Math.abs(v)/max*50):0;return`<div class="dv" role="img" aria-label="${v>=0?'超前':'落後'} ${Math.abs(v).toFixed(1)}">${w>0.5?`<i class="${v>0?'pos':'neg'}" style="width:${w}%"></i>`:''}</div>`};
+function renderVar(){
+  const V=variance(),EPS=0.05;
+  $('varHead').textContent=V.D<'2026-10-16'?'還沒有進度記錄。輸入第一筆後，這裡會比較每人、每張單比原排程超前或落後多少。':`截至 ${fdy(V.D)} 收工，和原排程同一天應完成的量相比（共 ${V.n} 筆記錄）。`;
+  const keys=new Set([...Object.keys(V.plan.item),...Object.keys(V.act.item)]);
+  let pPd=0,aPd=0,pQ=0,aQ=0;for(const k of keys){const p=V.plan.item[k]||0,a=V.act.item[k]||0;pQ+=p;aQ+=a;pPd+=p*(V.per[k]||0);aPd+=a*(V.per[k]||0)}
+  const pL=Object.values(V.plan.lathe).reduce((s,v)=>s+v,0),aL=Object.values(V.act.lathe).reduce((s,v)=>s+v,0);
+  const dPd=aPd-pPd;let dL=0;for(const o of P.orders)dL+=((V.act.lathe[o.id]||0)-(V.plan.lathe[o.id]||0))*(V.per['L|'+o.id]||1/V.LR);
+  const late=P.orders.filter(o=>S.ord[o.id].buf!=null&&S.ord[o.id].buf<0).length;
+  $('varSum').innerHTML=`<div class="vt"><span>包裝整體</span><b class="${cls(dPd,EPS)}">${Math.abs(dPd)<=EPS?'符合':(dPd>0?'超前 ':'落後 ')+Math.abs(dPd).toFixed(1)}</b><small>${Math.abs(dPd)<=EPS?'人天差異在 0.05 以內':'人天'}・實際 ${fmtN(aQ)} / 應包 ${fmtN(pQ)} PCS</small></div>
+  <div class="vt"><span>車台 FG1E</span><b class="${cls(dL,EPS)}">${Math.abs(dL)<=EPS?'符合':(dL>0?'超前 ':'落後 ')+Math.abs(dL).toFixed(1)}</b><small>${Math.abs(dL)<=EPS?'':'天・'}實際 ${fmtN(aL)} / 應做 ${fmtN(pL)} 顆</small></div>
+  <div class="vt"><span>預計會遲交的訂單</span><b class="${late?'neg':'pos'}">${late} 張</b><small>依目前進度重新推算</small></div>`;
+  const who=PEOPLE.map(w=>{const p=V.plan.who[w]||0,a=V.act.who[w]||0;return{w,p,a,d:a-p}});
+  const others=Object.keys(V.act.who).filter(w=>!PEOPLE.includes(w));for(const w of others)who.push({w,p:0,a:V.act.who[w],d:V.act.who[w]});
+  const mw=Math.max(0.5,...who.map(x=>Math.abs(x.d)));
+  $('varWho').innerHTML=who.map(x=>`<tr><td>${esc(x.w)}</td><td class="r num">${x.p.toFixed(2)}</td><td class="r num">${x.a.toFixed(2)}</td><td class="r num ${cls(x.d,EPS)}">${sgn(x.d,2)}</td><td>${dvBar(x.d,mw)}</td><td>${stat(x.d,EPS,' 天')}</td></tr>`).join('');
+  const ords=P.orders.map(o=>{let p=0,a=0,pd=0;for(const k of keys){if(!k.startsWith(o.id+'|'))continue;const pp=V.plan.item[k]||0,aa=V.act.item[k]||0;p+=pp;a+=aa;pd+=(aa-pp)*(V.per[k]||0)}return{o,p,a,pd}});
+  const mo=Math.max(0.5,...ords.map(x=>Math.abs(x.pd)));
+  $('varOrd').innerHTML=ords.map(({o,p,a,pd})=>{const r=S.ord[o.id];let fin='—';
+    if(r.fin==null)fin='<span class="tag ok">已包完</span>';else{const x=toT(r.fin,true).d,y=toT(r.planFin,true).d;const n=x>y?wdBetween(y,x):-wdBetween(x,y);fin=`${ft(r.fin,true)} ${n>0?`<span class="tag bad">晚 ${n} 天</span>`:n<0?`<span class="tag ok">早 ${-n} 天</span>`:'<span class="tag">同天</span>'}`}
+    return`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td class="r num">${fmtN(p)}</td><td class="r num">${fmtN(a)}</td><td class="r num ${cls(a-p,5)}">${sgnN(a-p)}</td><td class="r num ${cls(pd,EPS)}">${sgn(pd,2)}</td><td>${dvBar(pd,mo)}</td><td>${fin}</td></tr>`}).join('');
+  const its=[...keys].map(k=>{const p=V.plan.item[k]||0,a=V.act.item[k]||0;const [o,i]=k.split('|');return{o,i,p,a,d:(a-p)*(V.per[k]||0)}}).filter(x=>x.p>=5||x.a>0).sort((x,y)=>x.d-y.d);
+  $('varItem').innerHTML=its.length?its.map(x=>`<tr><td>${stat(x.d,EPS,' 人天')}</td><td class="num">${esc(x.o)}</td><td>${esc(x.i)}</td><td class="r num">${fmtN(x.p)}</td><td class="r num">${fmtN(x.a)}</td><td class="r num ${cls(x.a-x.p,5)}">${sgnN(x.a-x.p)}</td><td class="r num ${cls(x.d,EPS)}">${sgn(x.d,2)}</td></tr>`).join('')
+    :'<tr><td colspan="7" class="empty">截至這天，原排程還沒有要包的品號，也沒有記錄。</td></tr>';
+  const lo=P.orders.map(o=>({o,p:V.plan.lathe[o.id]||0,a:V.act.lathe[o.id]||0})).filter(x=>x.p>0||x.a>0);
+  $('varLathe').innerHTML=lo.length?lo.map(x=>{const d=(x.a-x.p)*(V.per['L|'+x.o.id]||1/V.LR);return`<tr><td class="num">${esc(x.o.id)}</td><td class="r num">${fmtN(x.p)}</td><td class="r num">${fmtN(x.a)}</td><td class="r num ${cls(x.a-x.p,5)}">${sgnN(x.a-x.p)}</td><td class="r num ${cls(d,EPS)}">${sgn(d,2)}</td><td>${stat(d,EPS,' 天')}</td></tr>`}).join('')
+    :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
+}
+function recompute(){if(!P)return;S=simulate();renderAll()}
+function renderAll(){renderHeader();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderHeader(){
+  const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
+  const last=entries.map(e=>e.date).sort().pop();const t=today();
+  let note=`排程從 ${fd(DAYS[Math.floor(S.simStart/480)])} 起推算`;
+  if(asofManual)note+='（手動）· <button class="btn ghost" id="asofReset" type="button">回到最新記錄</button>';
+  $('asofNote').innerHTML=note;
+  const rb=$('asofReset');if(rb)rb.onclick=()=>{asofManual=null;recompute()};
+  const b=$('ovBanner');
+  if(!entries.length)b.innerHTML='<div class="banner info">還沒有任何進度記錄，目前顯示的是 10/18 重排的排程（1475608061 的 04-6825、04-9317、04-9326 依原始訂單全數未包）。到「記錄進度」輸入每天包好的數量，完成日就會跟著更新。</div>';
+  else if(!asofManual&&last<prevWd(t)&&isWd(prevWd(t)))b.innerHTML=`<div class="banner">最後一筆記錄是 ${fdy(last)}。之後的工作天還沒有輸入進度，排程會把那幾天當作沒包。</div>`;
+  else b.innerHTML='';
+}
+function chipFor(r){if(r.fin==null)return'<span class="chip done">已包完</span>';if(r.buf<0)return`<span class="chip bad">遲 ${-r.buf} 天</span>`;if(r.buf<=2)return`<span class="chip warn">緩衝 ${r.buf} 天</span>`;return`<span class="chip ok">緩衝 ${r.buf} 天</span>`}
+function renderOrders(){
+  $('orders').innerHTML=P.orders.map(o=>{const r=S.ord[o.id];const pct=r.total?r.done/r.total*100:0;
+    let delta='';if(r.fin!=null){const a=toT(r.fin,true).d,b=toT(r.planFin,true).d;const n=a>b?wdBetween(b,a):-wdBetween(a,b);delta=n>0?`<span class="delta late">比原排程晚 ${n} 個工作天</span>`:n<0?`<span class="delta early">比原排程早 ${-n} 個工作天</span>`:'<span class="delta">與原排程同一天</span>'}
+    const rows=r.its.map(i=>{const k=o.id+'|'+i.item;const d=Math.min(i.qty,S.pack[k]||0);const it=S.item[k];
+      return`<tr><td>${esc(i.item)}</td><td class="r num">${fmtN(d)} / ${fmtN(i.qty)}</td><td>${it&&it.last!=null?ft(it.last,true):'<span class="tag ok">已包完</span>'}</td></tr>`}).join('');
+    return`<article class="ord"><div class="ord-h"><span class="cust">${esc(o.cust)}</span><b class="num">${esc(o.id)}</b>${chipFor(r)}</div>
+    <dl class="kv"><dt>出貨日</dt><dd>${fdy(o.ship)}</dd><dt>包完期限</dt><dd>${fdy(o.due)} 17:00</dd>
+    <dt>預計包完</dt><dd>${r.fin!=null?ft(r.fin,true):'—'} ${delta}</dd>
+    <dt>FG1E 燈泡</dt><dd>${r.fg!=null?'車台預計 '+ft(r.fg,true)+' 做完':'已備齊'}</dd></dl>
+    <div><div class="row" style="justify-content:space-between;font-size:13px"><span>已包 <span class="num">${fmtN(r.done)}</span> / <span class="num">${fmtN(r.total)}</span> PCS</span><span class="num">${pct.toFixed(0)}%</span></div><div class="bar" role="img" aria-label="已包 ${pct.toFixed(0)}%"><i style="width:${pct}%"></i></div></div>
+    <details class="items"><summary>各品號（${r.its.length}）</summary><div class="tbl" style="margin-top:8px"><table><thead><tr><th>品號</th><th class="r">已包 / 數量</th><th>預計包完</th></tr></thead><tbody>${rows}</tbody></table></div></details></article>`}).join('');
+}
+function renderLoads(){
+  $('loads').innerHTML=PEOPLE.map(w=>{const ts=S.tasks.filter(t=>t.w===w&&t.rem>0);const pd=ts.filter(t=>t.kind==='pack').reduce((s,t)=>s+t.work/480,0);
+    const ld=ts.filter(t=>t.kind==='lathe').reduce((s,t)=>s+t.work/480,0);const win=P.helpers[w];
+    const last=ts.length?Math.max(...ts.map(t=>t.en)):null;let warn='';
+    if(win&&last!=null&&last>dayEnd(win[1])+1e-6)warn=`<br><span class="tag bad">超出上工期間（到 ${fd(win[1])}）</span>`;
+    return`<div class="load"><b>${w}</b>包裝 <span class="num">${pd.toFixed(1)}</span> 人天${ld?`・車台 <span class="num">${ld.toFixed(1)}</span> 天`:''}<br>${win?`上工 ${fd(win[0])}–${fd(win[1])}<br>`:''}最後一段 ${last!=null?ft(last,true):'—'}${warn}</div>`}).join('');
+}
+function whoName(id){return id||''}
+function renderEntries(){
+  const nv=allEntries.filter(e=>e.void).length;$('entCount').textContent=allEntries.length?`共 ${allEntries.length} 筆${nv?`，作廢 ${nv} 筆`:''}`:'';
+  $('backup').hidden=!(dl&&allEntries.length);
+  if(editingId&&document.getElementById('eQty'))return;
+  const need=e=>e.kind==='lathe'?P.tasks.filter(t=>t.kind==='lathe'&&t.order===e.order).reduce((s,t)=>s+t.qty,0):((P.items.find(i=>i.order===e.order&&i.item===e.item)||{}).qty||0);
+  const cum={},run={};
+  for(const e of allEntries.filter(e=>!e.void).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.at||'').localeCompare(b.at||''))){const k=e.kind+'|'+e.order+'|'+e.item;run[k]=(run[k]||0)+(+e.qty||0);cum[e.id]=run[k]}
+  const pctCell=e=>{const n=need(e);if(e.void||!n)return'<td class="r num">—</td><td>—</td>';const c=cum[e.id],p=c/n*100;
+    return`<td class="r num">${fmtN(c)} / ${fmtN(n)}</td><td><div class="pc"><div class="bar"><i style="width:${Math.min(100,p)}%"></i></div><span class="num ${p>100.05?'neg':''}">${p.toFixed(1)}%</span></div></td>`};
+  const list=allEntries.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.at||'').localeCompare(a.at||''))
+  const ed=e=>`<tr class="editing"><td><input type="date" id="eDate" value="${esc(e.date)}"></td><td><select id="eWho">${PEOPLE.map(p=>`<option${p===e.who?' selected':''}>${p}</option>`).join('')}</select></td><td>${e.kind==='lathe'?'<span class="tag lathe">車台</span>':'包裝'}</td><td class="num">${esc(e.order)}</td><td>${esc(e.item)}</td><td class="r"><input type="number" id="eQty" min="1" step="1" value="${esc(e.qty)}" style="width:110px"></td><td colspan="4"><span class="mv"><button class="btn" type="button" data-esave="${esc(e.id)}" style="padding:4px 12px;font-size:13px">儲存更正</button><button class="btn ghost" type="button" data-ecancel="1">取消</button></span></td></tr>`;
+  const hist=e=>Array.isArray(e.history)&&e.history.length?` <span class="tag warn" title="${esc(e.history.map(h=>`原：${h.date} ${h.who} ${h.qty}`).join('\n'))}">已更正 ${e.history.length} 次</span>`:'';
+  const acts=e=>!canWrite?'':e.void?`<button class="btn ghost" type="button" data-restore="${esc(e.id)}">復原</button>`:`<span class="mv"><button class="btn ghost" type="button" data-edit="${esc(e.id)}">更正</button><button class="btn ghost" type="button" data-del="${esc(e.id)}">作廢</button></span>`;
+  $('entries').innerHTML=list.length?list.map(e=>e.id===editingId?ed(e):`<tr class="${e.void?'void':''}"><td>${fdy(e.date)}</td><td>${esc(e.who)}</td><td>${e.kind==='lathe'?'<span class="tag lathe">車台</span>':'包裝'}</td><td class="num">${esc(e.order)}</td><td>${esc(e.item)}</td><td class="r num">${fmtN(e.qty)}</td>${pctCell(e)}<td>${esc(whoName(e.by))}</td><td>${e.void?'<span class="tag">已作廢</span> ':''}${hist(e)}${acts(e)}</td></tr>`).join('')
+    :'<tr><td colspan="10" class="empty">還沒有記錄。用上面的表單輸入第一筆，例如 10/16 芳包了 04-9326 多少個。</td></tr>';
+}
+function renderDay(){
+  const d=dayPick||defaultDay();$('dayPick').value=d;
+  const list=S.daily[d]||[];
+  $('dayPeople').innerHTML=PEOPLE.map(w=>{const mine=list.filter(x=>x.t.w===w);const hrs=mine.reduce((s,x)=>s+x.mins,0)/60;
+    const body=mine.length?'<ul>'+mine.map(x=>`<li><span>${x.t.kind==='lathe'?'<span class="tag lathe">車台</span> ':''}${esc(x.t.item)} <span class="cust">${esc(x.t.order)}</span></span><span class="num">${(x.mins/60).toFixed(1)}h・${fmtN(Math.round(x.q/10)*10)}</span></li>`).join('')+'</ul>':'<p class="empty">沒有排工作</p>';
+    return`<div class="person"><h3>${w}<span class="cust num">${hrs?hrs.toFixed(1)+' 小時':''}</span></h3>${body}</div>`}).join('')+(isWd(d)?'':'<p class="empty">這天不是工作天。</p>');
+}
+function defaultDay(){let d=today();if(!isWd(d))d=nextWd(d);const s=DAYS[Math.floor(S.simStart/480)];return d<s?s:d}
+function renderSch(){
+  const w=$('schWho').value,o=$('schOrder').value;
+  const rows=S.tasks.filter(t=>t.rem>0&&(!w||t.w===w)&&(!o||t.order===o)).sort((a,b)=>a.st-b.st||PEOPLE.indexOf(a.w)-PEOPLE.indexOf(b.w));
+  $('resetOv').hidden=!(Object.keys(overrides).length||Object.keys(seqs).length)||!canWrite;
+  $('sch').innerHTML=rows.length?rows.map(t=>{const ord=orderOf(t.order);const win=P.helpers[t.w];
+    const over=(win&&t.en>dayEnd(win[1])+1e-6)||(t.kind==='pack'&&t.en>dayEnd(ord.due)+1e-6);
+    const a=toT(t.en,true).d,b=toT(t.pe,true).d;const n=a>b?wdBetween(b,a):-wdBetween(a,b);
+    const dl=n>0?`<span class="tag bad">晚 ${n} 天</span>`:n<0?`<span class="tag ok">早 ${-n} 天</span>`:'<span class="tag">同天</span>';
+    const sel=t.kind==='pack'&&canWrite?`<select data-ov="${esc(t.id)}" aria-label="改派 ${esc(t.seg)}">${PEOPLE.map(p=>`<option${p===t.w?' selected':''}>${p}</option>`).join('')}</select>${t.w!==t.orig?` <span class="tag warn">原 ${t.orig}</span>`:''}`:(t.w!==t.orig?`<span class="tag warn">原 ${t.orig}</span>`:'');
+    const mv=t.kind==='pack'&&canWrite?`<span class="mv"><button class="btn ghost" type="button" data-mv="top" data-id="${esc(t.id)}" ${t.pos===1?'disabled':''} aria-label="置頂 ${esc(t.seg)}">置頂</button><button class="btn ghost" type="button" data-mv="up" data-id="${esc(t.id)}" ${t.pos===1?'disabled':''} aria-label="上移">↑</button><button class="btn ghost" type="button" data-mv="down" data-id="${esc(t.id)}" ${t.pos===S.queue[t.w].length?'disabled':''} aria-label="下移">↓</button></span>`:'';
+    return`<tr class="${t.kind==='lathe'?'lathe':''} ${over?'over':''}"><td>${t.w}</td><td>${t.kind==='lathe'?'<span class="tag lathe">車台</span>':'包裝'}</td><td class="num">${esc(t.order)}</td><td>${esc(t.seg)}</td><td class="r num">${fmtN(t.rem)}</td><td class="r num">${(t.work/480).toFixed(2)}</td><td class="num">${ft(t.st)}</td><td class="num">${ft(t.en,true)}</td><td>${dl}</td><td><span class="num">#${t.pos||''}</span> ${mv}</td><td>${sel}</td></tr>`}).join('')
+    :'<tr><td colspan="11" class="empty">沒有剩下的工作。</td></tr>';
+}
+function renderMat(){
+  const t=today();
+  const rows=P.items.filter(i=>i.loc==='合欣').map(i=>{const k=i.order+'|'+i.item;const it=S.item[k];const started=(S.pack[k]||0)>0;
+    const first=it&&it.first!=null?toT(it.first).d:null;const due=first?prevWd(first):null;return{i,k,first,due,started,m:materials[k.replace('|','_')]}})
+    .sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+  $('mat').innerHTML=rows.map(r=>{const arrived=r.started||(r.m&&r.m.arrived);
+    let st;if(!r.first)st='<span class="tag ok">已包完</span>';else if(arrived)st=`<span class="tag ok">${r.started?'已開包':'已到料'}</span>`;
+    else if(r.due<t)st='<span class="tag bad">逾期未到</span>';else if(r.due<=addD(t,7))st='<span class="tag warn">一週內要到</span>';else st='<span class="tag">待到料</span>';
+    const box=r.started||!r.first?'':`<input type="checkbox" data-mat="${esc(r.k)}" aria-label="${esc(r.i.item)} 已到料"${r.m&&r.m.arrived?' checked':''}${canWrite?'':' disabled'}>`;
+    return`<tr><td>${st}</td><td>${r.due?fdy(r.due):'—'}</td><td>${r.first?fd(r.first):'—'}</td><td class="num">${esc(r.i.order)}</td><td>${esc(r.i.item)}</td><td class="r num">${fmtN(r.i.qty)}</td><td>${box}</td></tr>`}).join('');
+}
+
+/* ---------- entry form ---------- */
+function fillForm(){
+  $('fWho').innerHTML=PEOPLE.map(p=>`<option>${p}</option>`).join('');
+  $('fOrder').innerHTML=P.orders.map(o=>`<option value="${o.id}">${o.id}（${o.cust}）</option>`).join('');
+  $('schWho').innerHTML+=PEOPLE.map(p=>`<option>${p}</option>`).join('');
+  $('schOrder').innerHTML+=P.orders.map(o=>`<option value="${o.id}">${o.id}</option>`).join('');
+  $('fDate').value=isWd(today())?today():prevWd(today());
+  fillItems();
+}
+function fillItems(){
+  const k=$('fKind').value,o=$('fOrder').value;
+  if(k==='lathe'){$('fItem').innerHTML='<option>FG1E</option>';$('fWho').value='芳'}
+  else $('fItem').innerHTML=P.items.filter(i=>i.order===o&&i.loc==='合欣').map(i=>`<option>${esc(i.item)}</option>`).join('');
+  updateFormHint();
+}
+function updateFormHint(){
+  if(!S)return;const k=$('fKind').value,o=$('fOrder').value,it=$('fItem').value;const h=$('fHint');h.classList.remove('err');
+  if(k==='lathe'){const need=P.tasks.filter(t=>t.kind==='lathe'&&t.order===o).reduce((s,t)=>s+t.qty,0);const d=S.lathe[o]||0;
+    h.textContent=need?`這張單車台要做 ${fmtN(need)} 顆，已記錄 ${fmtN(d)} 顆（${(d/need*100).toFixed(1)}%），還剩 ${fmtN(Math.max(0,need-d))} 顆。`:'這張單沒有要車台做的 FG1E。';return}
+  const item=P.items.find(i=>i.order===o&&i.item===it);if(!item){h.textContent='';return}
+  const d=S.pack[o+'|'+it]||0;h.textContent=`${it} 要包 ${fmtN(item.qty)}，已記錄 ${fmtN(d)}（${(d/item.qty*100).toFixed(1)}%），還剩 ${fmtN(Math.max(0,item.qty-d))}。`;
+}
+async function save(ev){
+  ev.preventDefault();const h=$('fHint');
+  const e={date:$('fDate').value,who:$('fWho').value,kind:$('fKind').value,order:$('fOrder').value,item:$('fItem').value,qty:Math.round(+$('fQty').value)};
+  if(!e.date||!e.item||!(e.qty>0)){h.textContent='請填日期、品號和大於 0 的數量。';h.classList.add('err');return}
+  if(!db){h.textContent='還沒有設定資料來源（config.js），記錄沒有存。';h.classList.add('err');return}
+  if(!canWrite){h.textContent='請先在右上角輸入通關密碼解鎖。';h.classList.add('err');return}
+  e.at=new Date().toISOString();if(myId)e.by=myId;
+  $('fSave').disabled=true;
+  try{await db.collection('entries').doc().set(e);$('fQty').value='';h.textContent=`已記錄：${e.who} ${fd(e.date)} ${e.item} ${fmtN(e.qty)}。`;setTimeout(()=>offerContinue(e),400)}
+  catch(err){h.classList.add('err');h.textContent=err&&err.code==='invalid_argument'?'密碼不對或已失效，請重新解鎖。':'沒有存成功，請稍後再試一次。';if(err&&err.code==='invalid_argument'){canWrite=false;renderAll()}}
+  finally{$('fSave').disabled=false}
+}
+
+async function writeSeq(w,ids){await db.collection('seq').doc(WID[w]).set({w,ids,at:new Date().toISOString(),by:myId||''})}
+async function moveTask(id,mode){const t=S.tasks.find(x=>x.id===id);if(!t)return;const q=S.queue[t.w].slice();const i=q.indexOf(id);if(i<0)return;
+  q.splice(i,1);const j=mode==='top'?0:mode==='up'?Math.max(0,i-1):Math.min(q.length,i+1);q.splice(j,0,id);await writeSeq(t.w,q)}
+async function continueItem(who,order,item){
+  const ids=S.tasks.filter(t=>t.kind==='pack'&&t.order===order&&t.item===item&&t.rem>0).sort((a,b)=>a.st-b.st).map(t=>t.id);
+  for(const id of ids){const t=P.tasks.find(x=>x.id===id);const cur=overrides[id]||t.w;if(cur===who)continue;
+    if(t.w===who)await db.collection('overrides').doc(docIdOf(id)).delete();else await db.collection('overrides').doc(docIdOf(id)).set({task:id,w:who,at:new Date().toISOString(),by:myId||''})}
+  const rest=(S.queue[who]||[]).filter(id=>!ids.includes(id));await writeSeq(who,[...ids,...rest])}
+function offerContinue(e){
+  if(e.kind!=='pack'||!PEOPLE.includes(e.who))return;
+  const left=S.tasks.filter(t=>t.kind==='pack'&&t.order===e.order&&t.item===e.item&&t.rem>0);if(!left.length)return;
+  const first=S.queue[e.who]&&S.tasks.find(t=>t.id===S.queue[e.who].find(id=>S.tasks.find(x=>x.id===id).kind==='pack'));
+  if(first&&first.order===e.order&&first.item===e.item&&left.every(t=>t.w===e.who))return;
+  const rem=left.reduce((s,t)=>s+t.rem,0);const h=$('fHint');
+  h.innerHTML=`已記錄：${esc(e.who)} ${fd(e.date)} ${esc(e.item)} ${fmtN(e.qty)}。${esc(e.item)} 還剩 ${fmtN(rem)}，排程上不是 ${esc(e.who)} 接下來的工作。<button class="btn ghost" type="button" data-cont='${esc(JSON.stringify([e.who,e.order,e.item]))}'>讓 ${esc(e.who)} 接著包完</button>`}
+
+/* ---------- events ---------- */
+function bind(){
+  $('tabs').addEventListener('click',ev=>{const b=ev.target.closest('button[data-p]');if(!b)return;
+    for(const x of $('tabs').querySelectorAll('button')){const on=x===b;x.setAttribute('aria-selected',on);$('p-'+x.dataset.p).hidden=!on}
+    try{localStorage.setItem('tab',b.dataset.p)}catch(e){}});
+  try{const t=localStorage.getItem('tab');if(t&&$('t-'+t))$('t-'+t).click()}catch(e){}
+  $('asof').addEventListener('change',e=>{asofManual=e.target.value||null;recompute()});
+  $('fKind').addEventListener('change',fillItems);$('fOrder').addEventListener('change',fillItems);$('fItem').addEventListener('change',updateFormHint);
+  $('entryForm').addEventListener('submit',save);
+  $('dayPick').addEventListener('change',e=>{dayPick=e.target.value;renderDay()});
+  const step=n=>{let d=dayPick||defaultDay();d=n>0?nextWd(d):prevWd(d);dayPick=d;renderDay()};
+  $('dayPrev').onclick=()=>step(-1);$('dayNext').onclick=()=>step(1);
+  $('schWho').onchange=renderSch;$('schOrder').onchange=renderSch;
+  $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
+    const get=id=>allEntries.find(x=>x.id===id);
+    if(b.dataset.edit){editingId=b.dataset.edit;renderEntries();return}
+    if(b.dataset.ecancel){editingId=null;renderEntries();return}
+    if(b.dataset.esave){const e=get(b.dataset.esave);const nd=$('eDate').value,nw=$('eWho').value,nq=Math.round(+$('eQty').value);
+      if(!nd||!(nq>0)){b.textContent='日期或數量不對';return}
+      if(nd===e.date&&nw===e.who&&nq===e.qty){editingId=null;renderEntries();return}
+      b.disabled=true;try{await db.collection('entries').doc(e.id).update({date:nd,who:nw,qty:nq,editedAt:now,history:[...(Array.isArray(e.history)?e.history:[]),{date:e.date,who:e.who,qty:e.qty,at:now,by:myId||''}]});editingId=null;renderEntries()}
+      catch(err){b.disabled=false;b.textContent='沒有存成功，再試一次'}return}
+    if(b.dataset.restore){b.disabled=true;try{await db.collection('entries').doc(b.dataset.restore).update({void:false,restoredAt:now,restoredBy:myId||''})}catch(err){b.disabled=false;b.textContent='復原失敗'}return}
+    if(b.dataset.del){if(!b.classList.contains('danger')){b.classList.remove('ghost');b.classList.add('danger');b.textContent='確定作廢';setTimeout(()=>{if(b.isConnected){b.classList.add('ghost');b.classList.remove('danger');b.textContent='作廢'}},4000);return}
+      b.disabled=true;try{await db.collection('entries').doc(b.dataset.del).update({void:true,voidAt:now,voidBy:myId||''})}catch(err){b.disabled=false;b.textContent='作廢失敗'}}});
+  $('backup').onclick=async()=>{if(!dl)return;const b=$('backup');
+    const cols=['id','date','who','kind','order','item','qty','void','at','by','editedAt','history'];
+    const q=v=>{const t=v==null?'':typeof v==='object'?JSON.stringify(v):String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+    const rows=allEntries.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.at||'').localeCompare(b.at||''));
+    const csv='\ufeff'+[cols.join(','),...rows.map(e=>cols.map(c=>q(c==='void'?(e.void?'作廢':''):e[c])).join(','))].join('\r\n');
+    try{await dl.save({filename:`合欣包裝進度記錄_${today().replace(/-/g,'')}.csv`,data:csv})}catch(err){if(err&&err.code!=='declined')b.textContent='無法下載備份'}};
+  $('sch').addEventListener('change',async ev=>{const s=ev.target.closest('select[data-ov]');if(!s||!db)return;const id=s.dataset.ov;
+    const t=P.tasks.find(x=>x.id===id);s.disabled=true;
+    try{if(s.value===t.w)await db.collection('overrides').doc(docIdOf(id)).delete();else await db.collection('overrides').doc(docIdOf(id)).set({task:id,w:s.value,at:new Date().toISOString(),by:myId||''})}
+    catch(e){s.disabled=false}});
+  $('resetOv').onclick=async()=>{const b=$('resetOv');if(b.dataset.c!=='1'){b.dataset.c='1';b.textContent='確定還原全部？';return}
+    b.disabled=true;for(const id of Object.keys(overrides)){try{await db.collection('overrides').doc(docIdOf(id)).delete()}catch(e){}}for(const w of Object.keys(seqs)){try{await db.collection('seq').doc(WID[w]).delete()}catch(e){}}b.disabled=false;b.dataset.c='';b.textContent='還原所有改派與順序'};
+  $('sch').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-mv]');if(!b||!db)return;b.disabled=true;
+    try{await moveTask(b.dataset.id,b.dataset.mv)}catch(e){b.disabled=false}});
+  $('fHint').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-cont]');if(!b||!db)return;b.disabled=true;
+    const [who,order,item]=JSON.parse(b.dataset.cont);try{await continueItem(who,order,item);$('fHint').textContent=`已把 ${item} 剩下的排到 ${who} 最前面。`}catch(e){b.disabled=false;$('fHint').textContent='沒有存成功，請稍後再試一次。'}});
+  $('mat').addEventListener('change',async ev=>{const c=ev.target.closest('input[data-mat]');if(!c||!db)return;const id=c.dataset.mat.replace('|','_');
+    c.disabled=true;try{if(c.checked)await db.collection('materials').doc(id).set({arrived:true,at:new Date().toISOString(),by:myId||''});else await db.collection('materials').doc(id).delete()}
+    catch(e){c.checked=!c.checked}finally{c.disabled=false}});
+}
+
+/* ---------- data (Google 試算表) ---------- */
+const CFG=window.HS_CONFIG||{};const API=CFG.apiUrl||'';
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
+let pass=LS.get('hs_pass')||'',reloadT=null,loading=false;
+function setSync(t){$('sync').textContent=t}
+async function api(body){
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,pass}),redirect:'follow'});
+  const j=await r.json().catch(()=>({ok:false,error:'bad_response'}));
+  if(!j.ok){const err={code:j.error==='bad_passcode'?'invalid_argument':'unavailable',message:j.error||'error'};if(j.error==='bad_passcode')setAuth(false);throw err}
+  clearTimeout(reloadT);reloadT=setTimeout(load,300);return j}
+const ref=(c,id)=>({set:data=>id?api({action:'set',collection:c,id,data}):api({action:'add',collection:c,data}),
+  update:data=>api({action:'update',collection:c,id,data}),delete:()=>api({action:'delete',collection:c,id})});
+const sheetDb={collection:c=>({doc:id=>ref(c,id)})};
+dl={save:async({filename,data})=>{const a=document.createElement('a');const u=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}};
+async function load(){
+  if(!API||loading)return;loading=true;
+  try{const r=await fetch(API+'?action=all',{redirect:'follow'});const j=await r.json();if(!j.ok)throw 0;
+    allEntries=(j.entries||[]).map(e=>({...e,qty:+e.qty||0}));entries=allEntries.filter(e=>!e.void);
+    overrides={};for(const v of j.overrides||[])if(v.w&&v.task)overrides[v.task]=v.w;
+    seqs={};for(const v of j.seq||[])if(v.w&&Array.isArray(v.ids))seqs[v.w]=v.ids;
+    materials={};for(const v of j.materials||[])materials[v.id]=v;
+    const t=new Date();setSync('已同步 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'));recompute()}
+  catch(e){setSync('讀取失敗，稍後自動重試')}
+  finally{loading=false}}
+function setAuth(on){canWrite=!!on;$('authOff').hidden=on;$('authOn').hidden=!on;if(!on){pass='';LS.set('hs_pass',null)}if(S)renderAll()}
+async function unlock(){const v=$('passIn').value.trim();if(!v)return;pass=v;$('passBtn').disabled=true;
+  try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'check',pass}),redirect:'follow'}).then(r=>r.json()).then(j=>{if(!j.ok)throw j});
+    LS.set('hs_pass',pass);$('passIn').value='';setAuth(true)}
+  catch(e){pass='';$('passIn').value='';$('passIn').placeholder=e&&e.error==='not_configured'?'後端還沒設定密碼':'密碼不對，再試一次'}
+  finally{$('passBtn').disabled=false}}
+async function connect(){
+  myId=LS.get('hs_me')||'';$('meIn').value=myId;
+  $('meIn').addEventListener('change',e=>{myId=e.target.value.trim();LS.set('hs_me',myId||null)});
+  $('passBtn').onclick=unlock;$('passIn').addEventListener('keydown',e=>{if(e.key==='Enter')unlock()});
+  $('lockBtn').onclick=()=>setAuth(false);
+  if(!API){setSync('尚未設定資料來源');$('authBox').hidden=true;const b=$('loadErr');b.hidden=false;b.className='banner';b.textContent='還沒有設定資料來源：請依 README 的步驟部署 Google 試算表，並把網址填進 config.js。目前只能看排程，無法記錄。';renderAll();return}
+  db=sheetDb;
+  if(pass){setAuth(true)}else setAuth(false);
+  await load();
+  setInterval(()=>{if(document.visibilityState==='visible')load()},20000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});
+}
+
+fetch('plan.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(p=>{P=p;buildDays();fillForm();bind();recompute();connect()})
+  .catch(()=>{const b=$('loadErr');b.hidden=false;b.textContent='排程資料載入失敗，請重新整理頁面。'});
+})();
+</script>
+</body>
+</html>
