@@ -134,10 +134,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="top">
       <h1>合欣包裝進度</h1>
       <div class="asof"><label for="asof" style="flex-direction:row;align-items:center;gap:6px;color:inherit;font-size:13px">進度記到<input type="date" id="asof"></label><span id="asofNote"></span></div>
-      <span class="auth" id="authBox">
-        <span id="authOff"><label for="passIn" class="sr">通關密碼</label><input type="password" id="passIn" placeholder="輸入密碼以編輯" autocomplete="current-password"><button class="btn ghost" id="passBtn" type="button">解鎖</button></span>
-        <span id="authOn" hidden>可編輯・<label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:90px"> <button class="btn ghost" id="lockBtn" type="button">鎖定</button></span>
-      </span>
+      <span class="auth" id="authBox"><label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:100px"></span>
       <span class="sync" id="sync">連線中…</span>
     </div>
     <nav role="tablist" id="tabs">
@@ -475,11 +472,10 @@ async function save(ev){
   const e={date:$('fDate').value,who:$('fWho').value,kind:$('fKind').value,order:$('fOrder').value,item:$('fItem').value,qty:Math.round(+$('fQty').value)};
   if(!e.date||!e.item||!(e.qty>0)){h.textContent='請填日期、品號和大於 0 的數量。';h.classList.add('err');return}
   if(!db){h.textContent='還沒有設定資料來源（config.js），記錄沒有存。';h.classList.add('err');return}
-  if(!canWrite){h.textContent='請先在右上角輸入通關密碼解鎖。';h.classList.add('err');return}
   e.at=new Date().toISOString();if(myId)e.by=myId;
   $('fSave').disabled=true;
   try{await db.collection('entries').doc().set(e);$('fQty').value='';h.textContent=`已記錄：${e.who} ${fd(e.date)} ${e.item} ${fmtN(e.qty)}。`;setTimeout(()=>offerContinue(e),400)}
-  catch(err){h.classList.add('err');h.textContent=err&&err.code==='invalid_argument'?'密碼不對或已失效，請重新解鎖。':'沒有存成功，請稍後再試一次。';if(err&&err.code==='invalid_argument'){canWrite=false;renderAll()}}
+  catch(err){h.classList.add('err');h.textContent='沒有存成功，請稍後再試一次。';if(err&&err.code==='invalid_argument'){canWrite=false;renderAll()}}
   finally{$('fSave').disabled=false}
 }
 
@@ -548,12 +544,12 @@ function bind(){
 /* ---------- data (Google 試算表) ---------- */
 const CFG=window.HS_CONFIG||{};const API=CFG.apiUrl||'';
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
-let pass=LS.get('hs_pass')||'',reloadT=null,loading=false;
+let reloadT=null,loading=false;LS.set('hs_pass',null);
 function setSync(t){$('sync').textContent=t}
 async function api(body){
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,pass}),redirect:'follow'});
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});
   const j=await r.json().catch(()=>({ok:false,error:'bad_response'}));
-  if(!j.ok){const err={code:j.error==='bad_passcode'?'invalid_argument':'unavailable',message:j.error||'error'};if(j.error==='bad_passcode')setAuth(false);throw err}
+  if(!j.ok){throw {code:'unavailable',message:j.error||'error'}}
   clearTimeout(reloadT);reloadT=setTimeout(load,300);return j}
 const ref=(c,id)=>({set:data=>id?api({action:'set',collection:c,id,data}):api({action:'add',collection:c,data}),
   update:data=>api({action:'update',collection:c,id,data}),delete:()=>api({action:'delete',collection:c,id})});
@@ -569,20 +565,12 @@ async function load(){
     const t=new Date();setSync('已同步 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'));recompute()}
   catch(e){setSync('讀取失敗，稍後自動重試')}
   finally{loading=false}}
-function setAuth(on){canWrite=!!on;$('authOff').hidden=on;$('authOn').hidden=!on;if(!on){pass='';LS.set('hs_pass',null)}if(S)renderAll()}
-async function unlock(){const v=$('passIn').value.trim();if(!v)return;pass=v;$('passBtn').disabled=true;
-  try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'check',pass}),redirect:'follow'}).then(r=>r.json()).then(j=>{if(!j.ok)throw j});
-    LS.set('hs_pass',pass);$('passIn').value='';setAuth(true)}
-  catch(e){pass='';$('passIn').value='';$('passIn').placeholder=e&&e.error==='not_configured'?'後端還沒設定密碼':'密碼不對，再試一次'}
-  finally{$('passBtn').disabled=false}}
 async function connect(){
   myId=LS.get('hs_me')||'';$('meIn').value=myId;
   $('meIn').addEventListener('change',e=>{myId=e.target.value.trim();LS.set('hs_me',myId||null)});
-  $('passBtn').onclick=unlock;$('passIn').addEventListener('keydown',e=>{if(e.key==='Enter')unlock()});
-  $('lockBtn').onclick=()=>setAuth(false);
   if(!API){setSync('尚未設定資料來源');$('authBox').hidden=true;const b=$('loadErr');b.hidden=false;b.className='banner';b.textContent='還沒有設定資料來源：請依 README 的步驟部署 Google 試算表，並把網址填進 config.js。目前只能看排程，無法記錄。';renderAll();return}
   db=sheetDb;
-  if(pass){setAuth(true)}else setAuth(false);
+  canWrite=true;
   await load();
   setInterval(()=>{if(document.visibilityState==='visible')load()},20000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});

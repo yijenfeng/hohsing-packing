@@ -2,11 +2,10 @@
  * 合欣包裝進度：Google 試算表後端（Apps Script 網頁應用程式）
  *
  * 安裝：見 README.md「設定資料來源」。
- * 通關密碼放在「專案設定 → 指令碼屬性」的 PASSCODE，不寫在程式裡。
  *
  * 規則：
  * - 讀取（GET ?action=all）不需要密碼。
- * - 所有寫入都要帶正確的 PASSCODE。
+ * - 不需要密碼：知道網站的人都能讀寫。
  * - 「記錄進度」(entries) 只能新增和更新（更正／作廢／復原），程式沒有刪除功能。
  * - 每一次寫入都另外寫一行到「異動紀錄」工作表。
  */
@@ -29,9 +28,6 @@ function doGet(e) {
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, error: 'bad_request' }); }
-  const pass = PropertiesService.getScriptProperties().getProperty('PASSCODE');
-  if (!pass) return json_({ ok: false, error: 'not_configured' });
-  if (String(body.pass || '') !== pass) return json_({ ok: false, error: 'bad_passcode' });
   if (body.action === 'check') return json_({ ok: true });
 
   const lock = LockService.getScriptLock();
@@ -171,10 +167,9 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/** 第一次安裝時在編輯器執行一次：建立工作表並檢查密碼是否已設定。 */
+/** 第一次安裝時在編輯器執行一次：建立工作表。 */
 function setup() {
   entriesSheet_();
   Object.keys(DOC_COLLECTIONS).forEach(docSheet_);
-  const pass = PropertiesService.getScriptProperties().getProperty('PASSCODE');
-  Logger.log(pass ? '工作表已建立，PASSCODE 已設定。' : '工作表已建立。請到「專案設定 → 指令碼屬性」新增 PASSCODE。');
+  Logger.log('工作表已建立。');
 }
