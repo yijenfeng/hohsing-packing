@@ -144,6 +144,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <button role="tab" id="t-day" aria-selected="false" data-p="day">每日工作</button>
       <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
       <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
+      <button role="tab" id="t-cat" aria-selected="false" data-p="cat">品號對照</button>
     </nav>
   </div>
 </header>
@@ -207,6 +208,14 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   <section role="tabpanel" id="p-mat" hidden>
     <p class="note">料齊期限＝該品號依目前排程第一天開包的前一個工作天。已開始包裝的品號視為料已到。勾選「已到料」會存到試算表，所有人都看得到。</p>
     <div class="tbl"><table><thead><tr><th>狀態</th><th>料齊期限</th><th>開包日</th><th>訂單</th><th>品號</th><th class="r">數量</th><th>已到料</th></tr></thead><tbody id="mat"></tbody></table></div>
+  </section>
+  <section role="tabpanel" id="p-cat" hidden>
+    <div class="row"><label for="catQ" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">搜尋<input type="search" id="catQ" placeholder="品號、品名或條碼" style="width:220px;font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><span class="cust" id="catN"></span></div>
+    <h2>OHM</h2>
+    <div class="tbl"><table><thead><tr><th>品號</th><th>品名（Description）</th><th>包裝方式</th><th>包裝地點</th><th class="r">1475608061</th><th class="r">1475608062</th><th class="r">1475608063</th><th class="r">合計</th></tr></thead><tbody id="catOhm"></tbody></table></div>
+    <h2>YAZAWA</h2>
+    <div class="tbl"><table><thead><tr><th>品號</th><th>品名</th><th>供應商品號</th><th>條碼</th><th class="r">內盒／外箱</th><th>包裝方式</th><th class="r">00017614</th><th class="r">00017615</th><th class="r">00017616</th><th class="r">合計</th></tr></thead><tbody id="catYaz"></tbody></table></div>
+    <p class="note">品名來源：OHM 依 OHM_PO_Consolidated 2611-2703.xlsx 的 Description；YAZAWA 依 HO HSING 17614-17616.pdf（品名、條碼、每內盒／每外箱 PCS）。數量為各訂單原始數量，「—」表示該單沒有這個品號。</p>
   </section>
 </main>
 </div>
@@ -362,7 +371,7 @@ function renderVar(){
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
 function recompute(){if(!P)return;S=simulate();renderAll()}
-function renderAll(){renderHeader();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderAll(){renderHeader();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
@@ -445,6 +454,18 @@ function renderMat(){
     return`<tr><td>${st}</td><td>${r.due?fdy(r.due):'—'}</td><td>${r.first?fd(r.first):'—'}</td><td class="num">${esc(r.i.order)}</td><td>${esc(r.i.item)}</td><td class="r num">${fmtN(r.i.qty)}</td><td>${box}</td></tr>`}).join('');
 }
 
+function renderCat(){
+  const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
+  const hit=r=>!q||[r.item,r.name,r.sup,r.barcode].some(v=>v&&String(v).toLowerCase().includes(q));
+  const qty=(o,it)=>{const x=P.items.find(i=>i.order===o&&i.item===it);return x?x.qty:0};
+  const oo=c=>P.orders.filter(o=>o.cust===c).map(o=>o.id);
+  const cells=(c,it)=>{const v=oo(c).map(o=>qty(o,it));return v.map(n=>`<td class="r num">${n?fmtN(n):'—'}</td>`).join('')+`<td class="r num"><b>${fmtN(v.reduce((a,b)=>a+b,0))}</b></td>`};
+  const ohm=cat.filter(r=>r.cust==='OHM'&&hit(r)),yaz=cat.filter(r=>r.cust==='YAZAWA'&&hit(r));
+  $('catN').textContent=q?`找到 ${ohm.length+yaz.length} 個品號`:`共 ${cat.length} 個品號`;
+  $('catOhm').innerHTML=ohm.length?ohm.map(r=>`<tr><td class="num">${esc(r.item)}</td><td>${esc(r.name)}</td><td>${esc(r.how||'—')}</td><td>${r.loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${cells('OHM',r.item)}</tr>`).join(''):'<tr><td colspan="8" class="empty">沒有符合的品號。</td></tr>';
+  $('catYaz').innerHTML=yaz.length?yaz.map(r=>`<tr><td class="num">${esc(r.item)}</td><td>${esc(r.name)}</td><td>${esc(r.sup||'—')}</td><td class="num">${esc(r.barcode||'')}</td><td class="r num">${r.inner?`${fmtN(r.inner)} / ${fmtN(r.carton)}`:''}</td><td>${esc(r.how||'—')}</td>${cells('YAZAWA',r.item)}</tr>`).join(''):'<tr><td colspan="10" class="empty">沒有符合的品號。</td></tr>';
+}
+
 /* ---------- entry form ---------- */
 function fillForm(){
   $('fWho').innerHTML=PEOPLE.map(p=>`<option>${p}</option>`).join('');
@@ -457,7 +478,7 @@ function fillForm(){
 function fillItems(){
   const k=$('fKind').value,o=$('fOrder').value;
   if(k==='lathe'){$('fItem').innerHTML='<option>FG1E</option>';$('fWho').value='芳'}
-  else $('fItem').innerHTML=P.items.filter(i=>i.order===o&&i.loc==='合欣').map(i=>`<option>${esc(i.item)}</option>`).join('');
+  else{const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?c.name:''};$('fItem').innerHTML=P.items.filter(i=>i.order===o&&i.loc==='合欣').map(i=>`<option value="${esc(i.item)}">${esc(i.item)}　${esc(nm(i.item))}</option>`).join('')}
   updateFormHint();
 }
 function updateFormHint(){
@@ -507,7 +528,7 @@ function bind(){
   $('dayPick').addEventListener('change',e=>{dayPick=e.target.value;renderDay()});
   const step=n=>{let d=dayPick||defaultDay();d=n>0?nextWd(d):prevWd(d);dayPick=d;renderDay()};
   $('dayPrev').onclick=()=>step(-1);$('dayNext').onclick=()=>step(1);
-  $('schWho').onchange=renderSch;$('schOrder').onchange=renderSch;
+  $('schWho').onchange=renderSch;$('catQ').addEventListener('input',renderCat);$('schOrder').onchange=renderSch;
   $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
     const get=id=>allEntries.find(x=>x.id===id);
     if(b.dataset.edit){editingId=b.dataset.edit;renderEntries();return}
