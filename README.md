@@ -48,4 +48,4 @@ repo 的 Settings → Pages → Source 選「Deploy from a branch」，Branch �
 - `plan.json`：排程基準（每段工作的人員、品號、數量、人天、開始與結束時間、車台批次、國定假日、幫手上工期間）。
 - 來源：`芳智包裝總排程_加人力準時版.xlsx`（10/16 製表），10/18 依 OHM 原始訂單把 1475608061 的 04-6825（2,400）、04-9317（3,600）、04-9326（24,000）改為全數未包並重排。
 - 工時：吊入 1,300、袋入 3,400、卡入 5,100 PCS/人天，裝箱 17 箱/人天；車台 FG1E 14,000 顆/天；每天 08:00–12:00、13:00–17:00，週末與國定假日不排，換工作 15 分鐘。
-- `tools/`：產生 `plan.json` 的腳本（`extract_plan.py` 從排程 xlsx 匯出；`regen_1475608061.js` 加入上述三個品號並重排；`run_test.js` 用來在 Node 中跑網頁的排程邏輯；`catalog.py` 產生品號與品名對照）。
+- `tools/`：產生 `plan.json` 的腳本（`extract_plan.py` 從排程 xlsx 匯出；`regen_1475608061.js` 加入上述三個品號並重排；`run_test.js` 用來在 Node 中跑網頁的排程邏輯；`rebase.js` 依人天重算 plan.json 的時間；`catalog.py` 產生品號與品名對照）。
