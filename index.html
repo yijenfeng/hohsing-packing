@@ -98,6 +98,10 @@ td select{font-size:13px;padding:3px 6px;width:auto}
 .hint.err{color:var(--bad)}
 .mv{display:inline-flex;gap:4px;margin-left:4px}.mv .btn{padding:2px 8px}.btn.ghost:disabled{opacity:.35}
 .hint .btn{margin-left:8px}
+details.team{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+details.team>summary{cursor:pointer;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;font-size:14px}
+details.team>summary b{font-size:15px}
+details.team .tbl{border:0;border-top:1px solid var(--line);border-radius:0 0 10px 10px}
 .filt{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 fieldset.chips{border:0;margin:0;padding:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 fieldset.chips legend{float:left;font-size:13px;color:var(--muted);margin-right:4px;width:40px}
@@ -150,6 +154,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <button role="tab" id="t-ov" aria-selected="true" data-p="ov">各單狀況</button>
       <button role="tab" id="t-var" aria-selected="false" data-p="var">進度比較</button>
       <button role="tab" id="t-log" aria-selected="false" data-p="log">記錄進度</button>
+      <button role="tab" id="t-team" aria-selected="false" data-p="team">團隊目標</button>
       <button role="tab" id="t-day" aria-selected="false" data-p="day">每日工作</button>
       <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
       <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
@@ -197,6 +202,12 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="row" style="justify-content:space-between"><h2>所有記錄 <span class="cust" id="entCount"></span></h2><button class="btn ghost" id="backup" type="button" hidden>下載備份（CSV）</button></div>
     <p class="note">記錄不會被刪除。「作廢」只是不計入排程，隨時可以復原；「更正」會保留修改前的數值。網站程式更新時不會改動這些記錄。</p>
     <div class="tbl"><table><thead><tr><th>日期</th><th>人員</th><th>工作</th><th>訂單</th><th>品號</th><th class="r">數量</th><th class="r">累計 / 訂單數量</th><th>完成</th><th>記錄者</th><th></th></tr></thead><tbody id="entries"></tbody></table></div>
+  </section>
+
+  <section role="tabpanel" id="p-team" hidden>
+    <p class="note">團隊＝智＋幫手 1、2、3（芳另列）。依目前進度與改派重新推算；「已包」是記錄進度扣到團隊工作的數量。</p>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">團隊目標</th><th class="r">已包</th><th class="r">剩餘</th><th class="r">剩餘人天</th><th>團隊開工</th><th>團隊最後一包完成</th><th>包完期限</th><th>狀態</th><th class="r">芳負責</th></tr></thead><tbody id="teamSum"></tbody></table></div>
+    <div id="teamDetail" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
 
   <section role="tabpanel" id="p-day" hidden>
@@ -390,7 +401,7 @@ function renderVar(){
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
 function recompute(){if(!P)return;S=simulate();renderAll()}
-function renderAll(){renderHeader();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderAll(){renderHeader();renderTeam();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
@@ -475,6 +486,25 @@ function renderMat(){
     return`<tr><td>${st}</td><td>${r.due?fdy(r.due):'—'}</td><td>${r.first?fd(r.first):'—'}</td><td class="num">${esc(r.i.order)}</td><td>${esc(r.i.item)}</td><td class="r num">${fmtN(r.i.qty)}</td><td>${box}</td></tr>`}).join('');
 }
 
+const TEAM=['智','幫手1','幫手2','幫手3'];
+function renderTeam(){
+  const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.spec||c.name):''};
+  const bufTag=(fin,o)=>{if(fin==null)return'<span class="tag ok">已包完</span>';const d=toT(fin,true).d;const b=fin<=dayEnd(o.due)+1e-6?wdBetween(d,o.due):-wdBetween(o.due,d);
+    return b<0?`<span class="tag bad">遲 ${-b} 天</span>`:b<=2?`<span class="tag warn">緩衝 ${b} 天</span>`:`<span class="tag ok">緩衝 ${b} 天</span>`};
+  const sums=[],dets=[];
+  for(const o of P.orders){
+    const tt=S.tasks.filter(t=>t.order===o.id&&t.kind==='pack');const tm=tt.filter(t=>TEAM.includes(t.w)),fa=tt.filter(t=>t.w==='芳');
+    const Q=tm.reduce((a,t)=>a+t.qty,0),R=tm.reduce((a,t)=>a+t.rem,0),RP=tm.reduce((a,t)=>a+t.work/480,0);
+    const live=tm.filter(t=>t.rem>0);const st=live.length?Math.min(...live.map(t=>t.st)):null,fin=live.length?Math.max(...live.map(t=>t.en)):null;
+    const faQ=fa.reduce((a,t)=>a+t.qty,0);
+    sums.push(`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td class="r num">${fmtN(Q)}</td><td class="r num">${fmtN(Q-R)}</td><td class="r num">${fmtN(R)}</td><td class="r num">${RP.toFixed(1)}</td><td class="num">${st!=null?ft(st):'—'}</td><td class="num"><b>${fin!=null?ft(fin,true):'—'}</b></td><td>${fdy(o.due)}</td><td>${bufTag(fin,o)}</td><td class="r num">${fmtN(faQ)}</td></tr>`);
+    const by={};for(const t of tm){const r=by[t.item]=by[t.item]||{item:t.item,how:t.how,q:0,rem:0,who:new Set(),st:null,en:null};r.q+=t.qty;r.rem+=t.rem;r.who.add(t.w);if(t.rem>0){r.st=r.st==null?t.st:Math.min(r.st,t.st);r.en=r.en==null?t.en:Math.max(r.en,t.en)}}
+    const rows=Object.values(by).sort((a,b)=>(a.en??-1)-(b.en??-1)||a.item.localeCompare(b.item));
+    dets.push(`<details class="team" open><summary><b class="num">${esc(o.id)}</b><span class="cust">${esc(o.cust)}</span><span>團隊 ${rows.length} 個品號・${fmtN(Q)} PCS・剩 ${fmtN(R)}</span><span>最後一包 <b class="num">${fin!=null?ft(fin,true):'已包完'}</b></span>${bufTag(fin,o)}</summary>
+      <div class="tbl"><table><thead><tr><th>品號</th><th>規格／品名</th><th>包裝方式</th><th>負責</th><th class="r">目標</th><th class="r">已包</th><th class="r">剩餘</th><th>開始</th><th>完成</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="num">${esc(r.item)}</td><td>${esc(nm(r.item))}</td><td>${esc(r.how)}</td><td>${[...r.who].map(esc).join('、')}</td><td class="r num">${fmtN(r.q)}</td><td class="r num">${fmtN(r.q-r.rem)}</td><td class="r num">${fmtN(r.rem)}</td><td class="num">${r.st!=null?ft(r.st):'—'}</td><td class="num">${r.en!=null?ft(r.en,true):'<span class="tag ok">已包完</span>'}</td></tr>`).join('')}</tbody></table></div></details>`);
+  }
+  $('teamSum').innerHTML=sums.join('');$('teamDetail').innerHTML=dets.join('');
+}
 function renderCat(){
   const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
   const hit=r=>!q||[r.item,r.name,r.spec,r.sup,r.barcode].some(v=>v&&String(v).toLowerCase().includes(q));
