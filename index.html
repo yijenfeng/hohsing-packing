@@ -98,6 +98,15 @@ td select{font-size:13px;padding:3px 6px;width:auto}
 .hint.err{color:var(--bad)}
 .mv{display:inline-flex;gap:4px;margin-left:4px}.mv .btn{padding:2px 8px}.btn.ghost:disabled{opacity:.35}
 .hint .btn{margin-left:8px}
+.filt{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+fieldset.chips{border:0;margin:0;padding:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+fieldset.chips legend{float:left;font-size:13px;color:var(--muted);margin-right:4px;width:40px}
+fieldset.chips>div{display:flex;flex-wrap:wrap;gap:6px}
+.chip-cb{position:relative}
+.chip-cb input{position:absolute;opacity:0;width:1px;height:1px}
+.chip-cb span{display:inline-block;font-size:13.5px;padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);cursor:pointer;user-select:none}
+.chip-cb input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip-cb input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .pc{display:flex;align-items:center;gap:8px;min-width:120px}.pc .bar{flex:1;min-width:60px}.pc span{font-size:12.5px}
 span.neg{color:var(--bad)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -197,12 +206,12 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   </section>
 
   <section role="tabpanel" id="p-sch" hidden>
-    <div class="row">
-      <label for="schWho" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">人員<select id="schWho" style="width:auto"><option value="">全部</option></select></label>
-      <label for="schOrder" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">訂單<select id="schOrder" style="width:auto"><option value="">全部</option></select></label>
-      <button class="btn ghost" id="resetOv" type="button" hidden>還原所有改派與順序</button>
+    <div class="filt">
+      <fieldset class="chips"><legend>人員</legend><div id="schWho"></div></fieldset>
+      <fieldset class="chips"><legend>訂單</legend><div id="schOrder"></div></fieldset>
+      <div class="row"><span class="cust" id="schN"></span><button class="btn ghost" id="schClear" type="button">清除篩選</button><button class="btn ghost" id="resetOv" type="button" hidden>還原所有改派與順序</button></div>
     </div>
-    <p class="note">「順序」是這段工作在該人員手上的第幾段；「置頂」把它排到那個人最前面，↑↓ 前後移一段。「改派」可以把一段包裝工作換給另一個人，例如請智多包一點、取代某位幫手。芳的車台不能改派或移動，車台也不會早於原定時間開始。含 FG1E 的品號移到前面，仍要等燈泡做完才開包。紅色列＝超出該幫手的上工期間，或晚於包完期限。</p>
+    <p class="note">人員和訂單可以複選，不選就是全部。「順序」是這段工作在該人員手上的第幾段；「置頂」把它排到那個人最前面，↑↓ 前後移一段。「改派」可以把一段包裝工作換給另一個人，例如請智多包一點、取代某位幫手。芳的車台不能改派或移動，順序照排程；第 2 批以後要等 11/9 原料到才能開工。含 FG1E 的品號移到前面，仍要等燈泡做完才開包。紅色列＝超出該幫手的上工期間，或晚於包完期限。</p>
     <div class="tbl"><table><thead><tr><th>人員</th><th>工作</th><th>訂單</th><th>品號(分段)</th><th class="r">剩餘數量</th><th class="r">剩餘人天</th><th>開始</th><th>結束</th><th>比原排程</th><th>順序</th><th>改派</th></tr></thead><tbody id="sch"></tbody></table></div>
   </section>
 
@@ -225,6 +234,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
 <script>
 (() => {
 const WK='日一二三四五六';
+const LS2={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 const PEOPLE=['芳','智','幫手1','幫手2','幫手3'];
 const START={'智':'2026-10-19'};
 const WID={'芳':'fang','智':'zhi','幫手1':'h1','幫手2':'h2','幫手3':'h3'};
@@ -438,9 +448,11 @@ function renderDay(){
 }
 function defaultDay(){let d=today();if(!isWd(d))d=nextWd(d);const s=DAYS[Math.floor(S.simStart/480)];return d<s?s:d}
 function renderSch(){
-  const w=$('schWho').value,o=$('schOrder').value;
-  const rows=S.tasks.filter(t=>t.rem>0&&(!w||t.w===w)&&(!o||t.order===o)).sort((a,b)=>a.st-b.st||PEOPLE.indexOf(a.w)-PEOPLE.indexOf(b.w));
+  const sel=id=>[...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value);
+  const ws=sel('schWho'),os=sel('schOrder');
+  const rows=S.tasks.filter(t=>t.rem>0&&(!ws.length||ws.includes(t.w))&&(!os.length||os.includes(t.order))).sort((a,b)=>a.st-b.st||PEOPLE.indexOf(a.w)-PEOPLE.indexOf(b.w));
   $('resetOv').hidden=!(Object.keys(overrides).length||Object.keys(seqs).length)||!canWrite;
+  $('schN').textContent=`${ws.length?ws.join('、'):'全部人員'}・${os.length?os.length+' 張單':'全部訂單'}・共 ${rows.length} 段`;
   $('sch').innerHTML=rows.length?rows.map(t=>{const ord=orderOf(t.order);const win=P.helpers[t.w];
     const over=(win&&t.en>dayEnd(win[1])+1e-6)||(t.kind==='pack'&&t.en>dayEnd(ord.due)+1e-6);
     const a=toT(t.en,true).d,b=toT(t.pe,true).d;const n=a>b?wdBetween(b,a):-wdBetween(a,b);
@@ -478,8 +490,10 @@ function renderCat(){
 function fillForm(){
   $('fWho').innerHTML=PEOPLE.map(p=>`<option>${p}</option>`).join('');
   $('fOrder').innerHTML=P.orders.map(o=>`<option value="${o.id}">${o.id}（${o.cust}）</option>`).join('');
-  $('schWho').innerHTML+=PEOPLE.map(p=>`<option>${p}</option>`).join('');
-  $('schOrder').innerHTML+=P.orders.map(o=>`<option value="${o.id}">${o.id}</option>`).join('');
+  const chip=(name,v,label)=>`<label class="chip-cb"><input type="checkbox" name="${name}" value="${esc(v)}"><span>${esc(label)}</span></label>`;
+  $('schWho').innerHTML=PEOPLE.map(p=>chip('fw',p,p)).join('');
+  $('schOrder').innerHTML=P.orders.map(o=>chip('fo',o.id,`${o.id} ${o.cust}`)).join('');
+  try{const f=JSON.parse(LS2.get('hs_schf')||'{}');for(const v of f.w||[]){const x=document.querySelector(`#schWho input[value="${v}"]`);if(x)x.checked=true}for(const v of f.o||[]){const x=document.querySelector(`#schOrder input[value="${v}"]`);if(x)x.checked=true}}catch(e){}
   $('fDate').value=isWd(today())?today():prevWd(today());
   fillItems();
 }
@@ -536,7 +550,9 @@ function bind(){
   $('dayPick').addEventListener('change',e=>{dayPick=e.target.value;renderDay()});
   const step=n=>{let d=dayPick||defaultDay();d=n>0?nextWd(d):prevWd(d);dayPick=d;renderDay()};
   $('dayPrev').onclick=()=>step(-1);$('dayNext').onclick=()=>step(1);
-  $('schWho').onchange=renderSch;$('catQ').addEventListener('input',renderCat);$('schOrder').onchange=renderSch;
+  const saveF=()=>{const g=id=>[...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value);LS2.set('hs_schf',JSON.stringify({w:g('schWho'),o:g('schOrder')}));renderSch()};
+  $('schWho').addEventListener('change',saveF);$('schOrder').addEventListener('change',saveF);$('catQ').addEventListener('input',renderCat);
+  $('schClear').onclick=()=>{document.querySelectorAll('#schWho input,#schOrder input').forEach(x=>x.checked=false);saveF()};
   $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
     const get=id=>allEntries.find(x=>x.id===id);
     if(b.dataset.edit){editingId=b.dataset.edit;renderEntries();return}
