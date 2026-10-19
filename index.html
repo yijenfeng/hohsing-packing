@@ -241,7 +241,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
 </main>
 </div>
 
-<script src="config.js"></script>
+<script>document.write('<script src="config.js?t='+Date.now()+'"><\/script>')</script>
 <script>
 (() => {
 const WK='日一二三四五六';
@@ -412,7 +412,7 @@ function renderAll(){renderHeader();renderTeam();renderCat();renderVar();renderO
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
-  let note=`排程從 ${ft(S.simStart)} 起推算`;
+  let note=`排程從 ${ft(S.simStart)} 起推算・排程版本 ${esc(P.ver||P.made||'')}`;
   if(asofManual)note+='（手動）· <button class="btn ghost" id="asofReset" type="button">回到最新記錄</button>';
   $('asofNote').innerHTML=note;
   const rb=$('asofReset');if(rb)rb.onclick=()=>{asofManual=null;recompute()};
@@ -664,7 +664,7 @@ async function connect(){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});
 }
 
-fetch('plan.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(p=>{P=p;buildDays();fillForm();bind();recompute();connect()})
+fetch('plan.json?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(p=>{P=p;buildDays();fillForm();bind();recompute();connect()})
   .catch(()=>{const b=$('loadErr');b.hidden=false;b.textContent='排程資料載入失敗，請重新整理頁面。'});
 })();
 </script>

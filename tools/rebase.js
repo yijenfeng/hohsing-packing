@@ -6,6 +6,7 @@ const file=process.argv[2];global.P0=JSON.parse(fs.readFileSync(file,"utf8"));
 eval(js.replace("let P=null","let P=P0")+`
 buildDays();const r=simulate();
 for(const t of r.tasks){const pt=P.tasks.find(x=>x.id===t.id);const a=toT(t.st),b=toT(t.en,true);pt.s=a.d+'T'+a.hh;pt.e=b.d+'T'+b.hh}
+{const n=new Date(Date.now()+8*3600e3).toISOString();P.ver=(+n.slice(5,7))+'/'+(+n.slice(8,10))+' '+n.slice(11,16)}
 fs.writeFileSync(file,JSON.stringify(P));
 for(const o of P.orders){const x=r.ord[o.id];console.log(o.id,ft(x.fin,true),'buf',x.buf)}
 `);
