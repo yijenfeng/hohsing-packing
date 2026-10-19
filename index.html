@@ -134,7 +134,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="top">
       <h1>合欣包裝進度</h1>
       <div class="asof"><label for="asof" style="flex-direction:row;align-items:center;gap:6px;color:inherit;font-size:13px">進度記到<input type="date" id="asof"></label><span id="asofNote"></span></div>
-      <span class="auth" id="authBox"><label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:100px"></span>
+      <span class="auth" id="authBox"><span id="editOn" hidden><label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:100px"></span><span id="editOff" class="tag">唯讀檢視</span></span>
       <span class="sync" id="sync">連線中…</span>
     </div>
     <nav role="tablist" id="tabs">
@@ -174,6 +174,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   </section>
 
   <section role="tabpanel" id="p-log" hidden>
+    <p class="banner info" id="roNote">這個連結只能檢視。記錄進度、更正、改派和勾選料齊，需要使用編輯連結。</p>
     <form class="entry" id="entryForm" autocomplete="off">
       <label for="fDate">日期<input type="date" id="fDate" required></label>
       <label for="fWho">人員<select id="fWho"></select></label>
@@ -502,7 +503,7 @@ async function save(ev){
   e.at=new Date().toISOString();if(myId)e.by=myId;
   $('fSave').disabled=true;
   try{await db.collection('entries').doc().set(e);$('fQty').value='';h.textContent=`已記錄：${e.who} ${fd(e.date)} ${e.item} ${fmtN(e.qty)}。`;setTimeout(()=>offerContinue(e),400)}
-  catch(err){h.classList.add('err');h.textContent='沒有存成功，請稍後再試一次。';if(err&&err.code==='invalid_argument'){canWrite=false;renderAll()}}
+  catch(err){h.classList.add('err');h.textContent=err&&err.code==='invalid_argument'?'這個連結沒有編輯權限，記錄沒有存。':'沒有存成功，請稍後再試一次。';if(err&&err.code==='invalid_argument'){canWrite=false;renderAll()}}
   finally{$('fSave').disabled=false}
 }
 
@@ -571,12 +572,12 @@ function bind(){
 /* ---------- data (Google 試算表) ---------- */
 const CFG=window.HS_CONFIG||{};const API=CFG.apiUrl||'';
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
-let reloadT=null,loading=false;LS.set('hs_pass',null);
+let reloadT=null,loading=false,key='';LS.set('hs_pass',null);
 function setSync(t){$('sync').textContent=t}
 async function api(body){
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),redirect:'follow'});
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,key}),redirect:'follow'});
   const j=await r.json().catch(()=>({ok:false,error:'bad_response'}));
-  if(!j.ok){throw {code:'unavailable',message:j.error||'error'}}
+  if(!j.ok){if(j.error==='read_only')setEdit(false);throw {code:j.error==='read_only'?'invalid_argument':'unavailable',message:j.error||'error'}}
   clearTimeout(reloadT);reloadT=setTimeout(load,300);return j}
 const ref=(c,id)=>({set:data=>id?api({action:'set',collection:c,id,data}):api({action:'add',collection:c,data}),
   update:data=>api({action:'update',collection:c,id,data}),delete:()=>api({action:'delete',collection:c,id})});
@@ -592,12 +593,16 @@ async function load(){
     const t=new Date();setSync('已同步 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'));recompute()}
   catch(e){setSync('讀取失敗，稍後自動重試')}
   finally{loading=false}}
+function setEdit(on){canWrite=!!on;if(!on){key='';LS.set('hs_key',null)}$('editOn').hidden=!on;$('editOff').hidden=on;$('entryForm').hidden=!on;$('roNote').hidden=on;if(S)renderAll()}
 async function connect(){
+  try{const u=new URL(location.href);const k=u.searchParams.get('edit');if(k){LS.set('hs_key',k);u.searchParams.delete('edit');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash)}}catch(e){}
+  key=LS.get('hs_key')||'';
   myId=LS.get('hs_me')||'';$('meIn').value=myId;
   $('meIn').addEventListener('change',e=>{myId=e.target.value.trim();LS.set('hs_me',myId||null)});
   if(!API){setSync('尚未設定資料來源');$('authBox').hidden=true;const b=$('loadErr');b.hidden=false;b.className='banner';b.textContent='還沒有設定資料來源：請依 README 的步驟部署 Google 試算表，並把網址填進 config.js。目前只能看排程，無法記錄。';renderAll();return}
   db=sheetDb;
-  canWrite=true;
+  setEdit(!!key);
+  if(key){fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'check',key}),redirect:'follow'}).then(r=>r.json()).then(j=>{if(!j.ok&&j.error==='read_only')setEdit(false)}).catch(()=>{})}
   await load();
   setInterval(()=>{if(document.visibilityState==='visible')load()},20000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});

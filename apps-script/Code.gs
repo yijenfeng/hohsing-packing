@@ -5,7 +5,8 @@
  *
  * 規則：
  * - 讀取（GET ?action=all）不需要密碼。
- * - 不需要密碼：知道網站的人都能讀寫。
+ * - 讀取開放給所有人；寫入要帶編輯金鑰（指令碼屬性 EDIT_KEY）。
+ *   EDIT_KEY 只放在「編輯連結」裡（網址 ?edit=金鑰），一般網址只能看不能改。
  * - 「記錄進度」(entries) 只能新增和更新（更正／作廢／復原），程式沒有刪除功能。
  * - 每一次寫入都另外寫一行到「異動紀錄」工作表。
  */
@@ -28,6 +29,8 @@ function doGet(e) {
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ ok: false, error: 'bad_request' }); }
+  const key = PropertiesService.getScriptProperties().getProperty('EDIT_KEY');
+  if (key && String(body.key || '') !== key) return json_({ ok: false, error: 'read_only' });
   if (body.action === 'check') return json_({ ok: true });
 
   const lock = LockService.getScriptLock();
@@ -171,5 +174,6 @@ function json_(o) {
 function setup() {
   entriesSheet_();
   Object.keys(DOC_COLLECTIONS).forEach(docSheet_);
-  Logger.log('工作表已建立。');
+  const key = PropertiesService.getScriptProperties().getProperty('EDIT_KEY');
+  Logger.log(key ? '工作表已建立，EDIT_KEY 已設定。' : '工作表已建立。注意：尚未設定 EDIT_KEY，任何人都能寫入。');
 }
