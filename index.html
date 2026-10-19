@@ -205,7 +205,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   </section>
 
   <section role="tabpanel" id="p-team" hidden>
-    <p class="note">團隊＝智＋幫手 1、2、3（芳另列）。依目前進度與改派重新推算；「已包」是記錄進度扣到團隊工作的數量。</p>
+    <p class="note">團隊＝智＋幫手 1、2（芳另列）。依目前進度與改派重新推算；「已包」是記錄進度扣到團隊工作的數量。</p>
     <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">團隊目標</th><th class="r">已包</th><th class="r">剩餘</th><th class="r">剩餘人天</th><th>團隊開工</th><th>團隊最後一包完成</th><th>包完期限</th><th>狀態</th><th class="r">芳負責</th></tr></thead><tbody id="teamSum"></tbody></table></div>
     <div id="teamDetail" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
@@ -246,7 +246,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
 (() => {
 const WK='日一二三四五六';
 const LS2={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-const PEOPLE=['芳','智','幫手1','幫手2','幫手3'];
+const PEOPLE=['芳','智','幫手1','幫手2'];
 const START={'智':'2026-10-19'};
 const WID={'芳':'fang','智':'zhi','幫手1':'h1','幫手2':'h2','幫手3':'h3'};
 const docIdOf=tid=>{const i=tid.lastIndexOf('-');return WID[tid.slice(0,i)]+'-'+tid.slice(i+1)};
@@ -486,7 +486,7 @@ function renderMat(){
     return`<tr><td>${st}</td><td>${r.due?fdy(r.due):'—'}</td><td>${r.first?fd(r.first):'—'}</td><td class="num">${esc(r.i.order)}</td><td>${esc(r.i.item)}</td><td class="r num">${fmtN(r.i.qty)}</td><td>${box}</td></tr>`}).join('');
 }
 
-const TEAM=['智','幫手1','幫手2','幫手3'];
+const TEAM=['智','幫手1','幫手2'];
 function renderTeam(){
   const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.spec||c.name):''};
   const bufTag=(fin,o)=>{if(fin==null)return'<span class="tag ok">已包完</span>';const d=toT(fin,true).d;const b=fin<=dayEnd(o.due)+1e-6?wdBetween(d,o.due):-wdBetween(o.due,d);
