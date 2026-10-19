@@ -288,7 +288,7 @@ function simulate(){
   const preempt=new Set();fangPlan.forEach((t,i)=>{if(t.kind==='lathe'&&t.fixed)preempt.add(t.id);else if(t.kind==='lathe'&&fangPlan.slice(0,i).some(p=>p.kind==='pack'&&toM(p.e)>toM(t.s)+1))preempt.add(t.id)});
   for(const t of tasks)if(t.kind==='lathe'&&preempt.has(t.id)&&t.rem>0){const st=Math.max(t.ps,simStart);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];blocks.push([st,t.en]);ready[t.order]=Math.max(ready[t.order]||0,t.en)}
   // FG1E gate: only for segments the plan itself held until the bulbs were done (some used stock on hand)
-  const gate=t=>needsFG1E(t.order,t.item)&&t.ps>=(planReady[t.order]||0)-1?(ready[t.order]??0):0;
+  const gate=t=>needsFG1E(t.order,t.item)&&!t.stock?(ready[t.order]??0):0;  // stock:true＝可用現有燈泡庫存，不必等車台
   // place `work` minutes from `st`, skipping 車台 blocks for 芳
   const place=(st,work,useBlocks)=>{const pieces=[];let cur=st;
     if(useBlocks){for(;;){const b=blocks.find(b=>cur>=b[0]-1e-6&&cur<b[1]);if(!b)break;cur=b[1]+(b[1]%480<1e-6?0:CHG)}}
