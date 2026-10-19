@@ -134,7 +134,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="top">
       <h1>合欣包裝進度</h1>
       <div class="asof"><label for="asof" style="flex-direction:row;align-items:center;gap:6px;color:inherit;font-size:13px">進度記到<input type="date" id="asof"></label><span id="asofNote"></span></div>
-      <span class="auth" id="authBox"><span id="editOn" hidden><label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:100px"></span><span id="editOff" class="tag">唯讀檢視</span></span>
+      <span class="auth" id="authBox"><span id="editOn" hidden><label for="meIn" style="display:inline;font-size:13px">記錄者</label> <input type="text" id="meIn" placeholder="你的名字" style="width:100px"> <button class="btn ghost" id="lockBtn" type="button" title="這個瀏覽器改回唯讀；要再編輯需重新打開編輯連結">改為唯讀</button></span><span id="editOff" class="tag">唯讀檢視</span></span>
       <span class="sync" id="sync">連線中…</span>
     </div>
     <nav role="tablist" id="tabs">
@@ -598,6 +598,7 @@ function setEdit(on){canWrite=!!on;if(!on){key='';LS.set('hs_key',null)}$('editO
 async function connect(){
   try{const u=new URL(location.href);const k=u.searchParams.get('edit');if(k){LS.set('hs_key',k);u.searchParams.delete('edit');history.replaceState(null,'',u.pathname+(u.search||'')+u.hash)}}catch(e){}
   key=LS.get('hs_key')||'';
+  $('lockBtn').onclick=()=>setEdit(false);
   myId=LS.get('hs_me')||'';$('meIn').value=myId;
   $('meIn').addEventListener('change',e=>{myId=e.target.value.trim();LS.set('hs_me',myId||null)});
   if(!API){setSync('尚未設定資料來源');$('authBox').hidden=true;const b=$('loadErr');b.hidden=false;b.className='banner';b.textContent='還沒有設定資料來源：請依 README 的步驟部署 Google 試算表，並把網址填進 config.js。目前只能看排程，無法記錄。';renderAll();return}
