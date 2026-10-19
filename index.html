@@ -307,7 +307,7 @@ function simulate(){
   const ready={},planReady={},blocks=[];
   for(const t of P.tasks)if(t.kind==='lathe')planReady[t.order]=Math.max(planReady[t.order]||0,toM(t.e));
   const fangPlan=P.tasks.filter(t=>t.w==='芳').sort((a,b)=>a.s<b.s?-1:1);
-  const preempt=new Set();fangPlan.forEach((t,i)=>{if(t.kind==='lathe'&&t.fixed)preempt.add(t.id);else if(t.kind==='lathe'&&fangPlan.slice(0,i).some(p=>p.kind==='pack'&&toM(p.e)>toM(t.s)+1))preempt.add(t.id)});
+  const preempt=new Set(fangPlan.filter(t=>t.kind==='lathe'&&t.fixed).map(t=>t.id));  // 只有標記 fixed 的車台批次（第 2 批）會打斷包裝
   for(const t of tasks)if(t.kind==='lathe'&&preempt.has(t.id)&&t.rem>0){const st=Math.max(t.ps,simStart);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];blocks.push([st,t.en]);const rk=t.order+'|'+t.item;ready[rk]=Math.max(ready[rk]||0,t.en)}
   // FG1E gate: only for segments the plan itself held until the bulbs were done (some used stock on hand)
   const gate=t=>needsFG1E(t.order,t.item)?(t.stock?0:(ready[t.order+'|FG1E']??0)):needsFG7E(t.order,t.item)?(ready[t.order+'|FG7E']??0):0;  // stock:true＝可用現有燈泡庫存，不必等車台
