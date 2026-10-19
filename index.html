@@ -177,7 +177,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">原排程應包(PCS)</th><th class="r">實際已包(PCS)</th><th class="r">差異(PCS)</th><th class="r">差異(人天)</th><th class="dvh">落後 ← → 超前</th><th>預計包完</th></tr></thead><tbody id="varOrd"></tbody></table></div>
     <h2>品號</h2>
     <div class="tbl"><table><thead><tr><th>狀態</th><th>訂單</th><th>品號</th><th class="r">原排程應包</th><th class="r">實際已包</th><th class="r">差異(PCS)</th><th class="r">差異(人天)</th></tr></thead><tbody id="varItem"></tbody></table></div>
-    <h2>車台 FG1E</h2>
+    <h2>車台（FG1E、FG7E）</h2>
     <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">原排程應做(顆)</th><th class="r">實際做了(顆)</th><th class="r">差異(顆)</th><th class="r">差異(天)</th><th>狀態</th></tr></thead><tbody id="varLathe"></tbody></table></div>
     <p class="note">比較基準是 10/18 重排的排程（1475608061 依原始訂單，04-6825、04-9317、04-9326 全數未包）：截至「進度記到」那天收工，原排程每人、每品號應該完成多少，和「記錄進度」裡實際輸入的數量相比。差異換算成人天：用各品號的包裝工時（吊入 1,300、袋入 3,400、卡入 5,100 PCS/人天，含裝箱）計算，車台以 14,000 顆/天計算。一個人的差異人天，大約就是他超前或落後幾個工作天。誰包的照記錄上的人員算，改派不影響原排程的基準。</p>
   </section>
@@ -187,7 +187,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <form class="entry" id="entryForm" autocomplete="off">
       <label for="fDate">日期<input type="date" id="fDate" required></label>
       <label for="fWho">人員<select id="fWho"></select></label>
-      <label for="fKind">工作<select id="fKind"><option value="pack">包裝</option><option value="lathe">車台 FG1E</option></select></label>
+      <label for="fKind">工作<select id="fKind"><option value="pack">包裝</option><option value="lathe">車台</option></select></label>
       <label for="fOrder">訂單<select id="fOrder"></select></label>
       <label for="fItem">品號<select id="fItem"></select></label>
       <label for="fQty">數量（PCS／顆）<input type="number" id="fQty" min="1" step="1" inputmode="numeric" required></label>
@@ -272,9 +272,10 @@ const fmtN=n=>Math.round(n).toLocaleString('en-US');
 /* ---------- scheduling ---------- */
 const orderOf=id=>P.orders.find(o=>o.id===id);
 const ORDSEQ=()=>P.orders.map(o=>o.id);
+const needsFG7E=(o,it)=>String(o).startsWith('147')?it==='04-9328':it.includes('FG7E');
 const needsFG1E=(o,it)=>{const oid=String(o);if(oid.startsWith('147'))return['04-1411','04-6637','04-6665','04-6666','04-9326'].includes(it);return it.includes('FG1E')};
 function asofDate(){if(asofManual)return asofManual;const ds=entries.map(e=>e.date).filter(Boolean).sort();return ds.length?ds[ds.length-1]:'2026-10-15'}
-function doneMaps(){const pack={},lathe={};for(const e of entries){const q=+e.qty||0;if(e.kind==='lathe')lathe[e.order]=(lathe[e.order]||0)+q;else{const k=e.order+'|'+e.item;pack[k]=(pack[k]||0)+q}}return{pack,lathe}}
+function doneMaps(){const pack={},lathe={};for(const e of entries){const q=+e.qty||0;if(e.kind==='lathe'){const k=e.order+'|'+(e.item||'FG1E');lathe[k]=(lathe[k]||0)+q}else{const k=e.order+'|'+e.item;pack[k]=(pack[k]||0)+q}}return{pack,lathe}}
 function simulate(){
   const asof=asofDate();
   const planStart=toM('2026-10-16T08:00');
@@ -285,7 +286,7 @@ function simulate(){
   const left={...pack},leftL={...lathe};
   const tasks=P.tasks.slice().sort((a,b)=>a.s<b.s?-1:a.s>b.s?1:0).map(t=>{
     let rem=t.qty;
-    if(t.kind==='lathe'){const u=Math.min(rem,leftL[t.order]||0);leftL[t.order]=(leftL[t.order]||0)-u;rem-=u}
+    if(t.kind==='lathe'){const k=t.order+'|'+t.item;const u=Math.min(rem,leftL[k]||0);leftL[k]=(leftL[k]||0)-u;rem-=u}
     else{const k=t.order+'|'+t.item;const u=Math.min(rem,left[k]||0);left[k]=(left[k]||0)-u;rem-=u}
     const w=t.kind==='pack'&&overrides[t.id]?overrides[t.id]:t.w;
     return{...t,w,orig:t.w,rem,work:t.pd*480*rem/t.qty,ps:toM(t.s),pe:toM(t.e)}});
@@ -296,9 +297,9 @@ function simulate(){
   for(const t of P.tasks)if(t.kind==='lathe')planReady[t.order]=Math.max(planReady[t.order]||0,toM(t.e));
   const fangPlan=P.tasks.filter(t=>t.w==='芳').sort((a,b)=>a.s<b.s?-1:1);
   const preempt=new Set();fangPlan.forEach((t,i)=>{if(t.kind==='lathe'&&t.fixed)preempt.add(t.id);else if(t.kind==='lathe'&&fangPlan.slice(0,i).some(p=>p.kind==='pack'&&toM(p.e)>toM(t.s)+1))preempt.add(t.id)});
-  for(const t of tasks)if(t.kind==='lathe'&&preempt.has(t.id)&&t.rem>0){const st=Math.max(t.ps,simStart);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];blocks.push([st,t.en]);ready[t.order]=Math.max(ready[t.order]||0,t.en)}
+  for(const t of tasks)if(t.kind==='lathe'&&preempt.has(t.id)&&t.rem>0){const st=Math.max(t.ps,simStart);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];blocks.push([st,t.en]);const rk=t.order+'|'+t.item;ready[rk]=Math.max(ready[rk]||0,t.en)}
   // FG1E gate: only for segments the plan itself held until the bulbs were done (some used stock on hand)
-  const gate=t=>needsFG1E(t.order,t.item)&&!t.stock?(ready[t.order]??0):0;  // stock:true＝可用現有燈泡庫存，不必等車台
+  const gate=t=>needsFG1E(t.order,t.item)?(t.stock?0:(ready[t.order+'|FG1E']??0)):needsFG7E(t.order,t.item)?(ready[t.order+'|FG7E']??0):0;  // stock:true＝可用現有燈泡庫存，不必等車台
   // place `work` minutes from `st`, skipping 車台 blocks for 芳
   const place=(st,work,useBlocks)=>{const pieces=[];let cur=st;
     if(useBlocks){for(;;){const b=blocks.find(b=>cur>=b[0]-1e-6&&cur<b[1]);if(!b)break;cur=b[1]+(b[1]%480<1e-6?0:CHG)}}
@@ -316,7 +317,7 @@ function simulate(){
     const inSeq=list.filter(t=>pos.has(t.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let j=0;return list.map(t=>pos.has(t.id)?inSeq[j++]:t)};
   for(const w of PEOPLE){const q=orderQ(tasks.filter(t=>t.w===w&&t.rem>0&&!preempt.has(t.id)),w);queue[w]=q.map(t=>t.id);q.forEach((t,i)=>t.pos=i+1);for(const t of q){
     if(t.kind==='lathe'){const st=Math.max(free[w]+gap(w,t),t.notBefore?toM(t.notBefore):0);  // notBefore＝原料到貨前不能開工  // 車台照需要排：輪到就做，不再固定 11/9 開工
-      t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';ready[t.order]=Math.max(ready[t.order]||0,t.en);continue}
+      t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';{const rk=t.order+'|'+t.item;ready[rk]=Math.max(ready[rk]||0,t.en)}continue}
     const st=Math.max(free[w]+gap(w,t),gate(t));lastKind[w]='pack';
     t.pieces=place(st,t.work,w==='芳');t.st=t.pieces[0][0];t.en=t.pieces[t.pieces.length-1][1];free[w]=t.en;had[w]=true}}
   // per-day breakdown
@@ -353,7 +354,7 @@ function variance(){
     plan.who[t.orig]=(plan.who[t.orig]||0)+x.mins/480;
     if(t.kind==='lathe')plan.lathe[t.order]=(plan.lathe[t.order]||0)+x.q;else{const k=t.order+'|'+t.item;plan.item[k]=(plan.item[k]||0)+x.q}}}
   let n=0;for(const e of entries){if(!e.date||e.date>D)continue;n++;const q=+e.qty||0;
-    if(e.kind==='lathe'){act.lathe[e.order]=(act.lathe[e.order]||0)+q;act.who[e.who]=(act.who[e.who]||0)+q*(per['L|'+e.order]||1/LR)}
+    if(e.kind==='lathe'){act.lathe[e.order]=(act.lathe[e.order]||0)+q;act.who[e.who]=(act.who[e.who]||0)+q/LR}
     else{const k=e.order+'|'+e.item;act.item[k]=(act.item[k]||0)+q;act.who[e.who]=(act.who[e.who]||0)+q*(per[k]||0)}}
   return{D,per,plan,act,n,LR}}
 const sgn=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d);
@@ -367,10 +368,10 @@ function renderVar(){
   const keys=new Set([...Object.keys(V.plan.item),...Object.keys(V.act.item)]);
   let pPd=0,aPd=0,pQ=0,aQ=0;for(const k of keys){const p=V.plan.item[k]||0,a=V.act.item[k]||0;pQ+=p;aQ+=a;pPd+=p*(V.per[k]||0);aPd+=a*(V.per[k]||0)}
   const pL=Object.values(V.plan.lathe).reduce((s,v)=>s+v,0),aL=Object.values(V.act.lathe).reduce((s,v)=>s+v,0);
-  const dPd=aPd-pPd;let dL=0;for(const o of P.orders)dL+=((V.act.lathe[o.id]||0)-(V.plan.lathe[o.id]||0))*(V.per['L|'+o.id]||1/V.LR);
+  const dPd=aPd-pPd;let dL=0;for(const o of P.orders)dL+=((V.act.lathe[o.id]||0)-(V.plan.lathe[o.id]||0))/V.LR;
   const late=P.orders.filter(o=>S.ord[o.id].buf!=null&&S.ord[o.id].buf<0).length;
   $('varSum').innerHTML=`<div class="vt"><span>包裝整體</span><b class="${cls(dPd,EPS)}">${Math.abs(dPd)<=EPS?'符合':(dPd>0?'超前 ':'落後 ')+Math.abs(dPd).toFixed(1)}</b><small>${Math.abs(dPd)<=EPS?'人天差異在 0.05 以內':'人天'}・實際 ${fmtN(aQ)} / 應包 ${fmtN(pQ)} PCS</small></div>
-  <div class="vt"><span>車台 FG1E</span><b class="${cls(dL,EPS)}">${Math.abs(dL)<=EPS?'符合':(dL>0?'超前 ':'落後 ')+Math.abs(dL).toFixed(1)}</b><small>${Math.abs(dL)<=EPS?'':'天・'}實際 ${fmtN(aL)} / 應做 ${fmtN(pL)} 顆</small></div>
+  <div class="vt"><span>車台（FG1E＋FG7E）</span><b class="${cls(dL,EPS)}">${Math.abs(dL)<=EPS?'符合':(dL>0?'超前 ':'落後 ')+Math.abs(dL).toFixed(1)}</b><small>${Math.abs(dL)<=EPS?'':'天・'}實際 ${fmtN(aL)} / 應做 ${fmtN(pL)} 顆</small></div>
   <div class="vt"><span>預計會遲交的訂單</span><b class="${late?'neg':'pos'}">${late} 張</b><small>依目前進度重新推算</small></div>`;
   const who=PEOPLE.map(w=>{const p=V.plan.who[w]||0,a=V.act.who[w]||0;return{w,p,a,d:a-p}});
   const others=Object.keys(V.act.who).filter(w=>!PEOPLE.includes(w));for(const w of others)who.push({w,p:0,a:V.act.who[w],d:V.act.who[w]});
@@ -411,7 +412,7 @@ function renderOrders(){
     return`<article class="ord"><div class="ord-h"><span class="cust">${esc(o.cust)}</span><b class="num">${esc(o.id)}</b>${chipFor(r)}</div>
     <dl class="kv"><dt>出貨日</dt><dd>${fdy(o.ship)}</dd><dt>包完期限</dt><dd>${fdy(o.due)} 17:00</dd>
     <dt>預計包完</dt><dd>${r.fin!=null?ft(r.fin,true):'—'} ${delta}</dd>
-    <dt>FG1E 燈泡</dt><dd>${r.fg!=null?'車台預計 '+ft(r.fg,true)+' 做完':'已備齊'}</dd></dl>
+    <dt>車台燈泡</dt><dd>${r.fg!=null?'車台預計 '+ft(r.fg,true)+' 做完':'已備齊'}</dd></dl>
     <div><div class="row" style="justify-content:space-between;font-size:13px"><span>已包 <span class="num">${fmtN(r.done)}</span> / <span class="num">${fmtN(r.total)}</span> PCS</span><span class="num">${pct.toFixed(0)}%</span></div><div class="bar" role="img" aria-label="已包 ${pct.toFixed(0)}%"><i style="width:${pct}%"></i></div></div>
     <details class="items"><summary>各品號（${r.its.length}）</summary><div class="tbl" style="margin-top:8px"><table><thead><tr><th>品號</th><th class="r">已包 / 數量</th><th>預計包完</th></tr></thead><tbody>${rows}</tbody></table></div></details></article>`}).join('');
 }
@@ -427,7 +428,7 @@ function renderEntries(){
   const nv=allEntries.filter(e=>e.void).length;$('entCount').textContent=allEntries.length?`共 ${allEntries.length} 筆${nv?`，作廢 ${nv} 筆`:''}`:'';
   $('backup').hidden=!(dl&&allEntries.length);
   if(editingId&&document.getElementById('eQty'))return;
-  const need=e=>e.kind==='lathe'?P.tasks.filter(t=>t.kind==='lathe'&&t.order===e.order).reduce((s,t)=>s+t.qty,0):((P.items.find(i=>i.order===e.order&&i.item===e.item)||{}).qty||0);
+  const need=e=>e.kind==='lathe'?P.tasks.filter(t=>t.kind==='lathe'&&t.order===e.order&&t.item===(e.item||'FG1E')).reduce((s,t)=>s+t.qty,0):((P.items.find(i=>i.order===e.order&&i.item===e.item)||{}).qty||0);
   const cum={},run={};
   for(const e of allEntries.filter(e=>!e.void).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.at||'').localeCompare(b.at||''))){const k=e.kind+'|'+e.order+'|'+e.item;run[k]=(run[k]||0)+(+e.qty||0);cum[e.id]=run[k]}
   const pctCell=e=>{const n=need(e);if(e.void||!n)return'<td class="r num">—</td><td>—</td>';const c=cum[e.id],p=c/n*100;
@@ -499,14 +500,14 @@ function fillForm(){
 }
 function fillItems(){
   const k=$('fKind').value,o=$('fOrder').value;
-  if(k==='lathe'){$('fItem').innerHTML='<option>FG1E</option>';$('fWho').value='芳'}
+  if(k==='lathe'){const specs=[...new Set(P.tasks.filter(t=>t.kind==='lathe'&&t.order===o).map(t=>t.item))];$('fItem').innerHTML=specs.map(x=>`<option>${x}</option>`).join('');$('fWho').value='芳'}
   else{const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.spec||c.name):''};$('fItem').innerHTML=P.items.filter(i=>i.order===o&&i.loc==='合欣').map(i=>`<option value="${esc(i.item)}">${esc(i.item)}　${esc(nm(i.item))}</option>`).join('')}
   updateFormHint();
 }
 function updateFormHint(){
   if(!S)return;const k=$('fKind').value,o=$('fOrder').value,it=$('fItem').value;const h=$('fHint');h.classList.remove('err');
-  if(k==='lathe'){const need=P.tasks.filter(t=>t.kind==='lathe'&&t.order===o).reduce((s,t)=>s+t.qty,0);const d=S.lathe[o]||0;
-    h.textContent=need?`這張單車台要做 ${fmtN(need)} 顆，已記錄 ${fmtN(d)} 顆（${(d/need*100).toFixed(1)}%），還剩 ${fmtN(Math.max(0,need-d))} 顆。`:'這張單沒有要車台做的 FG1E。';return}
+  if(k==='lathe'){const need=P.tasks.filter(t=>t.kind==='lathe'&&t.order===o&&t.item===it).reduce((s,t)=>s+t.qty,0);const d=S.lathe[o+'|'+it]||0;
+    h.textContent=need?`這張單車台要做 ${it} ${fmtN(need)} 顆，已記錄 ${fmtN(d)} 顆（${(d/need*100).toFixed(1)}%），還剩 ${fmtN(Math.max(0,need-d))} 顆。`:'這張單沒有要車台做的燈泡。';return}
   const item=P.items.find(i=>i.order===o&&i.item===it);if(!item){h.textContent='';return}
   const d=S.pack[o+'|'+it]||0;h.textContent=`${it} 要包 ${fmtN(item.qty)}，已記錄 ${fmtN(d)}（${(d/item.qty*100).toFixed(1)}%），還剩 ${fmtN(Math.max(0,item.qty-d))}。`;
 }
