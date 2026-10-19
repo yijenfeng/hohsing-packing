@@ -253,6 +253,9 @@ const ft=(m,end)=>{const t=toT(m,end);return `${fd(t.d)} ${t.hh}`};
 const dayEnd=iso=>IDX[iso]*480+480;
 function wdBetween(a,b){/* workdays in (a,b] */let n=0;for(const d of DAYS){if(d>a&&d<=b)n++;if(d>b)break}return n}
 const today=()=>{const n=new Date(Date.now()+8*3600e3);return n.toISOString().slice(0,10)};
+const nowHM=()=>new Date(Date.now()+8*3600e3).toISOString().slice(11,16);
+/* 今天是工作天且還沒收工：回傳「現在」的工作分鐘；否則 null */
+const nowWorkM=()=>{const d=today(),hm=nowHM(),mins=+hm.slice(0,2)*60+ +hm.slice(3,5);return isWd(d)&&mins<1020?toM(d+'T'+hm):null};
 const fmtN=n=>Math.round(n).toLocaleString('en-US');
 
 /* ---------- scheduling ---------- */
@@ -264,7 +267,9 @@ function doneMaps(){const pack={},lathe={};for(const e of entries){const q=+e.qt
 function simulate(){
   const asof=asofDate();
   const planStart=toM('2026-10-16T08:00');
-  const simStart=Math.max(planStart,IDX[nextWd(asof)]*480);
+  // 進度記到今天、而且今天還沒收工：從現在起排（今天剩下的時間還能用）；否則從下一個工作天 08:00 起排
+  const nw=asof===today()?nowWorkM():null;
+  const simStart=Math.max(planStart,nw!=null?nw:IDX[nextWd(asof)]*480);
   const {pack,lathe}=doneMaps();
   const left={...pack},leftL={...lathe};
   const tasks=P.tasks.slice().sort((a,b)=>a.s<b.s?-1:a.s>b.s?1:0).map(t=>{
@@ -331,7 +336,8 @@ function pdPer(){const m={};for(const t of P.tasks){const k=t.kind==='lathe'?'L|
 function variance(){
   const D=asofDate(),B=baseline(),per=pdPer(),LR=P.rates.lathe;
   const plan={item:{},who:{},lathe:{}},act={item:{},who:{},lathe:{}};
-  for(const d in B.daily){if(d>D)continue;for(const x of B.daily[d]){const t=x.t;
+  const nw=D===today()?nowWorkM():null,frac=nw!=null?Math.max(0,Math.min(1,(nw-IDX[D]*480)/480)):1;
+  for(const d in B.daily){if(d>D)continue;const f=d===D?frac:1;for(const x0 of B.daily[d]){const x={t:x0.t,mins:x0.mins*f,q:x0.q*f};const t=x.t;
     plan.who[t.orig]=(plan.who[t.orig]||0)+x.mins/480;
     if(t.kind==='lathe')plan.lathe[t.order]=(plan.lathe[t.order]||0)+x.q;else{const k=t.order+'|'+t.item;plan.item[k]=(plan.item[k]||0)+x.q}}}
   let n=0;for(const e of entries){if(!e.date||e.date>D)continue;n++;const q=+e.qty||0;
@@ -345,7 +351,7 @@ function stat(v,eps,unit){if(Math.abs(v)<=eps)return'<span class="tag">符合</s
 const dvBar=(v,max)=>{const w=max>0?Math.min(50,Math.abs(v)/max*50):0;return`<div class="dv" role="img" aria-label="${v>=0?'超前':'落後'} ${Math.abs(v).toFixed(1)}">${w>0.5?`<i class="${v>0?'pos':'neg'}" style="width:${w}%"></i>`:''}</div>`};
 function renderVar(){
   const V=variance(),EPS=0.05;
-  $('varHead').textContent=V.D<'2026-10-16'?'還沒有進度記錄。輸入第一筆後，這裡會比較每人、每張單比原排程超前或落後多少。':`截至 ${fdy(V.D)} 收工，和原排程同一天應完成的量相比（共 ${V.n} 筆記錄）。`;
+  $('varHead').textContent=V.D<'2026-10-16'?'還沒有進度記錄。輸入第一筆後，這裡會比較每人、每張單比原排程超前或落後多少。':(V.D===today()&&nowWorkM()!=null?`截至今天 ${nowHM()}（今天的原排程量按目前時間比例計算）`:`截至 ${fdy(V.D)} 收工`)+`，和原排程同一時間應完成的量相比（共 ${V.n} 筆記錄）。`;
   const keys=new Set([...Object.keys(V.plan.item),...Object.keys(V.act.item)]);
   let pPd=0,aPd=0,pQ=0,aQ=0;for(const k of keys){const p=V.plan.item[k]||0,a=V.act.item[k]||0;pQ+=p;aQ+=a;pPd+=p*(V.per[k]||0);aPd+=a*(V.per[k]||0)}
   const pL=Object.values(V.plan.lathe).reduce((s,v)=>s+v,0),aL=Object.values(V.act.lathe).reduce((s,v)=>s+v,0);
@@ -375,7 +381,7 @@ function renderAll(){renderHeader();renderCat();renderVar();renderOrders();rende
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
-  let note=`排程從 ${fd(DAYS[Math.floor(S.simStart/480)])} 起推算`;
+  let note=`排程從 ${ft(S.simStart)} 起推算`;
   if(asofManual)note+='（手動）· <button class="btn ghost" id="asofReset" type="button">回到最新記錄</button>';
   $('asofNote').innerHTML=note;
   const rb=$('asofReset');if(rb)rb.onclick=()=>{asofManual=null;recompute()};
