@@ -222,7 +222,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <fieldset class="chips"><legend>訂單</legend><div id="schOrder"></div></fieldset>
       <div class="row"><span class="cust" id="schN"></span><button class="btn ghost" id="schClear" type="button">清除篩選</button><button class="btn ghost" id="resetOv" type="button" hidden>還原所有改派與順序</button></div>
     </div>
-    <p class="note">人員和訂單可以複選，不選就是全部。「順序」是這段工作在該人員手上的第幾段；「置頂」把它排到那個人最前面，↑↓ 前後移一段。「改派」可以把一段包裝工作換給另一個人，例如請智多包一點、取代某位幫手。芳的車台不能改派或移動，順序照排程；第 2 批以後要等 11/9 原料到才能開工。含 FG1E 的品號移到前面，仍要等燈泡做完才開包。紅色列＝超出該幫手的上工期間，或晚於包完期限。</p>
+    <p class="note">人員和訂單可以複選，不選就是全部。「順序」是這段工作在該人員手上的第幾段；「置頂」把它排到那個人最前面，↑↓ 前後移一段。「改派」可以把一段包裝工作換給另一個人，例如請智多包一點、取代某位幫手。芳的車台不能改派或移動，順序照排程；第 2 批以後要等 11/9 原料到才能開工。含 FG1E／FG7E 的品號要等燈泡做完才開包；等燈泡時，會先做後面已經可以開包的品號，不會空等。紅色列＝超出該幫手的上工期間，或晚於包完期限。</p>
     <div class="tbl"><table><thead><tr><th>人員</th><th>工作</th><th>訂單</th><th>品號(分段)</th><th class="r">剩餘數量</th><th class="r">剩餘人天</th><th>開始</th><th>結束</th><th>比原排程</th><th>順序</th><th>改派</th></tr></thead><tbody id="sch"></tbody></table></div>
   </section>
 
@@ -326,11 +326,18 @@ function simulate(){
   const queue={};
   const orderQ=(list,w)=>{const sq=seqs[w];if(!sq||!sq.length)return list;const lid=new Set(list.filter(t=>t.kind==='lathe').map(t=>t.id));const pos=new Map(sq.filter(id=>!lid.has(id)).map((id,i)=>[id,i]));  // 車台批次照 plan.json 順序，不受手動順序影響
     const inSeq=list.filter(t=>pos.has(t.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let j=0;return list.map(t=>pos.has(t.id)?inSeq[j++]:t)};
-  for(const w of PEOPLE){const q=orderQ(tasks.filter(t=>t.w===w&&t.rem>0&&!preempt.has(t.id)),w);queue[w]=q.map(t=>t.id);q.forEach((t,i)=>t.pos=i+1);for(const t of q){
-    if(t.kind==='lathe'){const st=Math.max(free[w]+gap(w,t),t.notBefore?toM(t.notBefore):0);  // notBefore＝原料到貨前不能開工  // 車台照需要排：輪到就做，不再固定 11/9 開工
-      t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';{const rk=t.order+'|'+t.item;ready[rk]=Math.max(ready[rk]||0,t.en)}continue}
-    const st=Math.max(free[w]+gap(w,t),gate(t));lastKind[w]='pack';
-    t.pieces=place(st,t.work,w==='芳');t.st=t.pieces[0][0];t.en=t.pieces[t.pieces.length-1][1];free[w]=t.en;had[w]=true}}
+  // 依順序做；若下一段包裝還在等燈泡，就先做排在它後面、已經可以開包的包裝（不越過車台批次），避免空等
+  for(const w of PEOPLE){const q=orderQ(tasks.filter(t=>t.w===w&&t.rem>0&&!preempt.has(t.id)),w);queue[w]=q.map(t=>t.id);q.forEach((t,i)=>t.pos=i+1);
+    const L=q.slice();
+    while(L.length){
+      let k=0;const t0=L[0];
+      if(t0.kind==='pack'&&gate(t0)>free[w]+gap(w,t0)+1e-6){
+        for(let i=1;i<L.length&&L[i].kind==='pack';i++){if(gate(L[i])<=free[w]+gap(w,L[i])+1e-6){k=i;break}}}
+      const t=L.splice(k,1)[0];
+      if(t.kind==='lathe'){const st=Math.max(free[w]+gap(w,t),t.notBefore?toM(t.notBefore):0);  // notBefore＝原料到貨前不能開工
+        t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';{const rk=t.order+'|'+t.item;ready[rk]=Math.max(ready[rk]||0,t.en)}continue}
+      const st=Math.max(free[w]+gap(w,t),gate(t));lastKind[w]='pack';
+      t.pieces=place(st,t.work,w==='芳');t.st=t.pieces[0][0];t.en=t.pieces[t.pieces.length-1][1];free[w]=t.en;had[w]=true}}
   // per-day breakdown
   const daily={};
   for(const t of tasks){if(!(t.rem>0))continue;const tot=t.pieces.reduce((s,p)=>s+p[1]-p[0],0);
