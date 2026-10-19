@@ -302,7 +302,7 @@ function simulate(){
   for(const w of PEOPLE){const win=P.helpers[w];const s0=win?win[0]:(START[w]||'2026-10-16');free[w]=Math.max(simStart,IDX[s0]*480)}
   const lastKind={};const gap=(w,t)=>had[w]&&free[w]%480>1e-6&&!(lastKind[w]==='lathe'&&t.kind==='lathe')?CHG:0;
   const queue={};
-  const orderQ=(list,w)=>{const sq=seqs[w];if(!sq||!sq.length)return list;const pos=new Map(sq.map((id,i)=>[id,i]));
+  const orderQ=(list,w)=>{const sq=seqs[w];if(!sq||!sq.length)return list;const lid=new Set(list.filter(t=>t.kind==='lathe').map(t=>t.id));const pos=new Map(sq.filter(id=>!lid.has(id)).map((id,i)=>[id,i]));  // 車台批次照 plan.json 順序，不受手動順序影響
     const inSeq=list.filter(t=>pos.has(t.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));let j=0;return list.map(t=>pos.has(t.id)?inSeq[j++]:t)};
   for(const w of PEOPLE){const q=orderQ(tasks.filter(t=>t.w===w&&t.rem>0&&!preempt.has(t.id)),w);queue[w]=q.map(t=>t.id);q.forEach((t,i)=>t.pos=i+1);for(const t of q){
     if(t.kind==='lathe'){const st=Math.max(free[w]+gap(w,t),t.ps);t.st=st;t.en=st+t.work;t.pieces=[[st,t.en]];free[w]=t.en;had[w]=true;lastKind[w]='lathe';ready[t.order]=Math.max(ready[t.order]||0,t.en);continue}
