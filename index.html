@@ -180,6 +180,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <button role="tab" id="t-day" aria-selected="false" data-p="day">每日工作</button>
       <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
       <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
+      <button role="tab" id="t-bulb" aria-selected="false" data-p="bulb">燈泡統計</button>
       <button role="tab" id="t-cat" aria-selected="false" data-p="cat">品號對照</button>
     </nav>
   </div>
@@ -256,6 +257,20 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <p class="note">料齊期限＝該品號依目前排程第一天開包的前一個工作天。已開始包裝的品號視為料已到。勾選「已到料」會存到試算表，所有人都看得到。</p>
     <div class="tbl"><table><thead><tr><th>狀態</th><th>料齊期限</th><th>開包日</th><th>訂單</th><th>品號</th><th class="r">數量</th><th>已到料</th></tr></thead><tbody id="mat"></tbody></table></div>
   </section>
+  <section role="tabpanel" id="p-bulb" hidden>
+    <div class="prHead"><h1>合欣電業 FG-1E／FG-7E 用量統計</h1><div id="prMetaBulb"></div></div>
+    <div class="row noPrint" style="justify-content:flex-end"><button class="btn" id="bulbPrint" type="button">列印</button></div>
+    <h2>客戶合計（顆）</h2>
+    <div class="tbl"><table><thead><tr><th>客戶</th><th class="r">FG-1E</th><th class="r">其中新豐包裝</th><th class="r">FG-7E</th><th class="r">合計</th></tr></thead><tbody id="bulbCust"></tbody></table></div>
+    <h2>各訂單（顆）</h2>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th>出貨日</th><th class="r">FG-1E 用量</th><th class="r">其中新豐</th><th class="r">FG-1E 車台排程</th><th class="r">FG-1E 車台已做</th><th class="r">FG-7E 用量</th><th class="r">FG-7E 車台已做</th><th>備註</th></tr></thead><tbody id="bulbOrd"></tbody></table></div>
+    <h2>OHM 品號明細（顆）</h2>
+    <div class="tbl"><table><thead id="bulbOhmH"></thead><tbody id="bulbOhm"></tbody></table></div>
+    <h2>YAZAWA 品號明細（顆）</h2>
+    <div class="tbl"><table><thead id="bulbYazH"></thead><tbody id="bulbYaz"></tbody></table></div>
+    <p class="note">用量＝訂單數量 × 每包顆數。例如 FG-1EX2P、FG1E2P 每包 2 顆，FG-1E 3P、FG1E3PY 每包 3 顆，FG-1E/4P、FG-1E/5P、FG1E4P、FG1E5P 每包 1 顆 FG-1E。OHM 新豐包裝的品號也用合欣車台做的 FG-1E，所以計入用量。「車台已做」來自記錄進度裡的車台數量。</p>
+  </section>
+
   <section role="tabpanel" id="p-cat" hidden>
     <div class="prHead"><h1>合欣電業 品號對照</h1><div id="prMetaCat"></div></div>
     <div class="row noPrint" style="justify-content:space-between"><span><label for="catQ" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">搜尋<input type="search" id="catQ" placeholder="品號、規格、品名或條碼" style="width:220px;font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><span class="cust" id="catN"></span></span><button class="btn" id="catPrint" type="button">列印</button></div>
@@ -435,7 +450,7 @@ function renderVar(){
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
 function recompute(){if(!P)return;S=simulate();renderAll()}
-function renderAll(){renderHeader();renderTeam();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderAll(){renderHeader();renderTeam();renderBulb();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
@@ -546,6 +561,33 @@ function renderTeam(){
 }
 function nowTxt(){const n=new Date(),pad=x=>String(x).padStart(2,'0');return `${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`}
 function doPrint(id){document.querySelectorAll('section.prOn').forEach(x=>x.classList.remove('prOn'));$(id).classList.add('prOn');document.body.classList.add('pr');setTimeout(()=>window.print(),50)}
+// 每包使用的燈泡顆數
+const BULB={OHM:{'04-6637':['FG-1E',2],'04-9326':['FG-1E',1],'04-1411':['FG-1E',2],'04-6665':['FG-1E',1],'04-6666':['FG-1E',1],'04-1473':['FG-1E',2],'04-1474':['FG-1E',3],'04-1919':['FG-1E',2],'04-6543':['FG-1E',2],'04-9328':['FG-7E',1]},
+  YAZAWA:{FG1E2P:['FG-1E',2],FG1E2P1CT:['FG-1E',2],FG1E3PY:['FG-1E',3],FG1E4P:['FG-1E',1],FG1E4P1CT:['FG-1E',1],FG1E5P:['FG-1E',1],FG1E5P1CT:['FG-1E',1],FG7E1P:['FG-7E',1],FG7EB:['FG-7E',1]}};
+function renderBulb(){
+  const custOf=o=>(P.orders.find(x=>x.id===o)||{}).cust;
+  const use=P.items.map(i=>{const b=(BULB[custOf(i.order)]||{})[i.item];return b?{...i,bulb:b[0],per:b[1],n:i.qty*b[1]}:null}).filter(Boolean);
+  const sum=f=>use.filter(f).reduce((a,u)=>a+u.n,0);
+  const {lathe}=doneMaps();
+  const n0=v=>v?fmtN(v):'—';
+  $('bulbCust').innerHTML=['OHM','YAZAWA',null].map(c=>{const f=u=>!c||custOf(u.order)===c;const e1=sum(u=>f(u)&&u.bulb==='FG-1E'),xf=sum(u=>f(u)&&u.bulb==='FG-1E'&&u.loc==='新豐'),e7=sum(u=>f(u)&&u.bulb==='FG-7E');
+    const tag=c?esc(c):'合計';return`<tr${c?'':' style="font-weight:600"'}><td>${tag}</td><td class="r num">${fmtN(e1)}</td><td class="r num">${n0(xf)}</td><td class="r num">${fmtN(e7)}</td><td class="r num"><b>${fmtN(e1+e7)}</b></td></tr>`}).join('');
+  $('bulbOrd').innerHTML=P.orders.map(o=>{const e1=sum(u=>u.order===o.id&&u.bulb==='FG-1E'),xf=sum(u=>u.order===o.id&&u.bulb==='FG-1E'&&u.loc==='新豐'),e7=sum(u=>u.order===o.id&&u.bulb==='FG-7E');
+    const sch=P.tasks.filter(t=>t.kind==='lathe'&&t.order===o.id&&t.item==='FG1E').reduce((a,t)=>a+t.qty,0);
+    const d1=lathe[o.id+'|FG1E']||0,d7=lathe[o.id+'|FG7E']||0;
+    const note=e1-sch>0?`庫存已有 ${fmtN(e1-sch)}`:'';
+    return`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td>${fdy(o.ship)}</td><td class="r num"><b>${fmtN(e1)}</b></td><td class="r num">${n0(xf)}</td><td class="r num">${fmtN(sch)}</td><td class="r num">${n0(d1)}</td><td class="r num"><b>${n0(e7)}</b></td><td class="r num">${n0(d7)}</td><td>${note}</td></tr>`}).join('');
+  const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.name||c.spec||''):''};
+  for(const [c,hid,bid] of [['OHM','bulbOhmH','bulbOhm'],['YAZAWA','bulbYazH','bulbYaz']]){
+    const os=P.orders.filter(o=>o.cust===c);const its=Object.keys(BULB[c]).filter(it=>use.some(u=>u.item===it&&custOf(u.order)===c));
+    its.sort((a,b)=>BULB[c][a][0].localeCompare(BULB[c][b][0])||a.localeCompare(b));
+    $(hid).innerHTML=`<tr><th>品號</th><th>規格／品名</th><th>燈泡</th><th class="r">每包顆數</th><th>包裝地點</th>${os.map(o=>`<th class="r">${esc(o.id)}</th>`).join('')}<th class="r">合計</th></tr>`;
+    const row=it=>{const b=BULB[c][it];const v=os.map(o=>{const u=use.find(u=>u.order===o.id&&u.item===it);return u?u.n:0});const loc=(use.find(u=>u.item===it&&custOf(u.order)===c)||{}).loc;
+      return`<tr><td class="num">${esc(it)}</td><td>${esc(nm(it))}</td><td>${b[0]}</td><td class="r num">${b[1]}</td><td>${loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${v.map(n=>`<td class="r num">${n0(n)}</td>`).join('')}<td class="r num"><b>${fmtN(v.reduce((a,b)=>a+b,0))}</b></td></tr>`};
+    const tot=bk=>{const v=os.map(o=>sum(u=>u.order===o.id&&u.bulb===bk));return`<tr style="font-weight:600;background:var(--soft)"><td colspan="5">${bk} 小計</td>${v.map(n=>`<td class="r num">${n0(n)}</td>`).join('')}<td class="r num">${fmtN(v.reduce((a,b)=>a+b,0))}</td></tr>`};
+    $(bid).innerHTML=['FG-1E','FG-7E'].map(bk=>its.filter(it=>BULB[c][it][0]===bk).map(row).join('')+tot(bk)).join('');
+  }
+}
 function renderCat(){
   const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
   const hit=r=>!q||[r.item,r.name,r.spec,r.sup,r.barcode].some(v=>v&&String(v).toLowerCase().includes(q));
@@ -630,6 +672,7 @@ function bind(){
     $('prMeta').textContent=`進度記到 ${$('asof').value||'—'}・訂單：${os.options[os.selectedIndex].text}${$('teamFa').checked?'（含芳負責的品號）':''}・列印時間 ${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`;
     document.querySelectorAll('#teamDetail details').forEach(d=>d.open=true);
     doPrint('p-team')});
+  $('bulbPrint').addEventListener('click',()=>{$('prMetaBulb').textContent=`車台已做記到 ${$('asof').value||'—'}・列印時間 ${nowTxt()}`;doPrint('p-bulb')});
   $('catPrint').addEventListener('click',()=>{const q=($('catQ').value||'').trim();
     $('prMetaCat').textContent=`${q?'搜尋：'+q+'・':''}${$('catN').textContent}・列印時間 ${nowTxt()}`;doPrint('p-cat')});
   window.addEventListener('afterprint',()=>{document.body.classList.remove('pr');document.querySelectorAll('section.prOn').forEach(x=>x.classList.remove('prOn'))});$('teamFa').addEventListener('change',saveT);
