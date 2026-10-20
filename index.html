@@ -137,6 +137,27 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
 .dv i{position:absolute;top:2px;height:8px;border-radius:2px}
 .dv i.pos{left:50%;background:var(--ok)} .dv i.neg{right:50%;background:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.prHead{display:none}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body.pr-team{background:#fff!important;color:#000!important;font-size:11px}
+  body.pr-team *{color:#000!important;box-shadow:none!important}
+  body.pr-team header,body.pr-team #loadErr,body.pr-team main>section:not(#p-team),body.pr-team .noPrint{display:none!important}
+  body.pr-team #p-team{display:block!important}
+  body.pr-team .prHead{display:block;margin:0 0 8px}
+  body.pr-team .prHead h1{font-size:18px;margin:0 0 2px}
+  body.pr-team .wrap{max-width:none;padding:0}
+  body.pr-team .tbl{overflow:visible;border:1px solid #999;border-radius:0;background:#fff}
+  body.pr-team th{position:static;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.pr-team th,body.pr-team td{padding:3px 6px;border-bottom:1px solid #ccc}
+  body.pr-team tr{break-inside:avoid}
+  body.pr-team thead{display:table-header-group}
+  body.pr-team details.team{border:0;background:#fff;break-inside:auto;margin-top:6px}
+  body.pr-team details.team>summary{list-style:none;padding:4px 0;break-after:avoid}
+  body.pr-team details.team>summary::-webkit-details-marker{display:none}
+  body.pr-team .tag{border:1px solid #888;background:#fff!important}
+  body.pr-team .note{font-size:10px}
+}
 </style>
 </head>
 <body>
@@ -205,9 +226,11 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   </section>
 
   <section role="tabpanel" id="p-team" hidden>
+    <div class="prHead"><h1>合欣電業 包裝團隊目標</h1><div id="prMeta"></div></div>
+    <div class="row noPrint" style="justify-content:flex-end"><button class="btn" id="teamPrint" type="button">列印</button></div>
     <p class="note">團隊＝智＋幫手 1、2（芳另列）。依目前進度與改派重新推算；「已包」是記錄進度扣到團隊工作的數量。</p>
     <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">團隊目標</th><th class="r">已包</th><th class="r">剩餘</th><th class="r">剩餘人天</th><th>團隊開工</th><th>團隊最後一包完成</th><th>包完期限</th><th>狀態</th><th class="r">芳負責</th></tr></thead><tbody id="teamSum"></tbody></table></div>
-    <div class="row" style="gap:16px;flex-wrap:wrap;align-items:center"><h2 style="margin:0">品號完成日</h2><label for="teamOrd">訂單 <select id="teamOrd"></select></label><label><input type="checkbox" id="teamFa"> 含芳負責的品號</label></div>
+    <div class="row" style="gap:16px;flex-wrap:wrap;align-items:center"><h2 style="margin:0">品號完成日</h2><label for="teamOrd" class="noPrint">訂單 <select id="teamOrd"></select></label><label class="noPrint"><input type="checkbox" id="teamFa"> 含芳負責的品號</label></div>
     <p class="note">每張單的品號依「完成」日期由早到晚排列，已包完的排在最後。</p>
     <div id="teamDetail" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
@@ -597,7 +620,13 @@ function bind(){
   $('dayPrev').onclick=()=>step(-1);$('dayNext').onclick=()=>step(1);
   const saveF=()=>{const g=id=>[...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value);LS2.set('hs_schf',JSON.stringify({w:g('schWho'),o:g('schOrder')}));renderSch()};
   $('schWho').addEventListener('change',saveF);$('schOrder').addEventListener('change',saveF);$('catQ').addEventListener('input',renderCat);
-  const saveT=()=>{LS2.set('hs_teamf',JSON.stringify({o:$('teamOrd').value,fa:$('teamFa').checked}));renderTeam()};$('teamOrd').addEventListener('change',saveT);$('teamFa').addEventListener('change',saveT);
+  const saveT=()=>{LS2.set('hs_teamf',JSON.stringify({o:$('teamOrd').value,fa:$('teamFa').checked}));renderTeam()};$('teamOrd').addEventListener('change',saveT);
+  $('teamPrint').addEventListener('click',()=>{
+    const os=$('teamOrd');const pad=n=>String(n).padStart(2,'0');const n=new Date();
+    $('prMeta').textContent=`進度記到 ${$('asof').value||'—'}・訂單：${os.options[os.selectedIndex].text}${$('teamFa').checked?'（含芳負責的品號）':''}・列印時間 ${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`;
+    document.querySelectorAll('#teamDetail details').forEach(d=>d.open=true);
+    document.body.classList.add('pr-team');setTimeout(()=>window.print(),50)});
+  window.addEventListener('afterprint',()=>document.body.classList.remove('pr-team'));$('teamFa').addEventListener('change',saveT);
   $('schClear').onclick=()=>{document.querySelectorAll('#schWho input,#schOrder input').forEach(x=>x.checked=false);saveF()};
   $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
     const get=id=>allEntries.find(x=>x.id===id);
