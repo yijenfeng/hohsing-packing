@@ -207,6 +207,8 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   <section role="tabpanel" id="p-team" hidden>
     <p class="note">團隊＝智＋幫手 1、2（芳另列）。依目前進度與改派重新推算；「已包」是記錄進度扣到團隊工作的數量。</p>
     <div class="tbl"><table><thead><tr><th>訂單</th><th class="r">團隊目標</th><th class="r">已包</th><th class="r">剩餘</th><th class="r">剩餘人天</th><th>團隊開工</th><th>團隊最後一包完成</th><th>包完期限</th><th>狀態</th><th class="r">芳負責</th></tr></thead><tbody id="teamSum"></tbody></table></div>
+    <div class="row" style="gap:16px;flex-wrap:wrap;align-items:center"><h2 style="margin:0">品號完成日</h2><label for="teamOrd">訂單 <select id="teamOrd"></select></label><label><input type="checkbox" id="teamFa"> 含芳負責的品號</label></div>
+    <p class="note">每張單的品號依「完成」日期由早到晚排列，已包完的排在最後。</p>
     <div id="teamDetail" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
 
@@ -498,6 +500,8 @@ function renderTeam(){
   const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.spec||c.name):''};
   const bufTag=(fin,o)=>{if(fin==null)return'<span class="tag ok">已包完</span>';const d=toT(fin,true).d;const b=fin<=dayEnd(o.due)+1e-6?wdBetween(d,o.due):-wdBetween(o.due,d);
     return b<0?`<span class="tag bad">遲 ${-b} 天</span>`:b<=2?`<span class="tag warn">緩衝 ${b} 天</span>`:`<span class="tag ok">緩衝 ${b} 天</span>`};
+  const os=$('teamOrd');if(os.options.length!==P.orders.length+1){os.innerHTML='<option value="">全部訂單</option>'+P.orders.map(o=>`<option value="${esc(o.id)}">${esc(o.id)} ${esc(o.cust)}</option>`).join('');try{const f=JSON.parse(LS2.get('hs_teamf')||'{}');os.value=f.o||'';$('teamFa').checked=!!f.fa}catch(e){}}
+  const selO=os.value,withFa=$('teamFa').checked;
   const sums=[],dets=[];
   for(const o of P.orders){
     const tt=S.tasks.filter(t=>t.order===o.id&&t.kind==='pack');const tm=tt.filter(t=>TEAM.includes(t.w)),fa=tt.filter(t=>t.w==='芳');
@@ -505,9 +509,12 @@ function renderTeam(){
     const live=tm.filter(t=>t.rem>0);const st=live.length?Math.min(...live.map(t=>t.st)):null,fin=live.length?Math.max(...live.map(t=>t.en)):null;
     const faQ=fa.reduce((a,t)=>a+t.qty,0);
     sums.push(`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td class="r num">${fmtN(Q)}</td><td class="r num">${fmtN(Q-R)}</td><td class="r num">${fmtN(R)}</td><td class="r num">${RP.toFixed(1)}</td><td class="num">${st!=null?ft(st):'—'}</td><td class="num"><b>${fin!=null?ft(fin,true):'—'}</b></td><td>${fdy(o.due)}</td><td>${bufTag(fin,o)}</td><td class="r num">${fmtN(faQ)}</td></tr>`);
-    const by={};for(const t of tm){const r=by[t.item]=by[t.item]||{item:t.item,how:t.how,q:0,rem:0,who:new Set(),st:null,en:null};r.q+=t.qty;r.rem+=t.rem;r.who.add(t.w);if(t.rem>0){r.st=r.st==null?t.st:Math.min(r.st,t.st);r.en=r.en==null?t.en:Math.max(r.en,t.en)}}
-    const rows=Object.values(by).sort((a,b)=>(a.en??-1)-(b.en??-1)||a.item.localeCompare(b.item));
-    dets.push(`<details class="team" open><summary><b class="num">${esc(o.id)}</b><span class="cust">${esc(o.cust)}</span><span>團隊 ${rows.length} 個品號・${fmtN(Q)} PCS・剩 ${fmtN(R)}</span><span>最後一包 <b class="num">${fin!=null?ft(fin,true):'已包完'}</b></span>${bufTag(fin,o)}</summary>
+    if(selO&&selO!==o.id)continue;
+    const src=withFa?tt.filter(t=>TEAM.includes(t.w)||t.w==='芳'):tm;
+    const by={};for(const t of src){const r=by[t.item]=by[t.item]||{item:t.item,how:t.how,q:0,rem:0,who:new Set(),st:null,en:null};r.q+=t.qty;r.rem+=t.rem;r.who.add(t.w);if(t.rem>0){r.st=r.st==null?t.st:Math.min(r.st,t.st);r.en=r.en==null?t.en:Math.max(r.en,t.en)}}
+    const rows=Object.values(by).sort((a,b)=>(a.en??Infinity)-(b.en??Infinity)||a.item.localeCompare(b.item));
+    const dq=rows.reduce((x,r)=>x+r.q,0),dr=rows.reduce((x,r)=>x+r.rem,0),dfs=rows.filter(r=>r.en!=null).map(r=>r.en),df=dfs.length?Math.max(...dfs):null;
+    dets.push(`<details class="team" open><summary><b class="num">${esc(o.id)}</b><span class="cust">${esc(o.cust)}</span><span>${withFa?'含芳 ':'團隊 '}${rows.length} 個品號・${fmtN(dq)} PCS・剩 ${fmtN(dr)}</span><span>最後一包 <b class="num">${df!=null?ft(df,true):'已包完'}</b></span>${bufTag(df,o)}</summary>
       <div class="tbl"><table><thead><tr><th>品號</th><th>規格／品名</th><th>包裝方式</th><th>負責</th><th class="r">目標</th><th class="r">已包</th><th class="r">剩餘</th><th>開始</th><th>完成</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="num">${esc(r.item)}</td><td>${esc(nm(r.item))}</td><td>${esc(r.how)}</td><td>${[...r.who].map(esc).join('、')}</td><td class="r num">${fmtN(r.q)}</td><td class="r num">${fmtN(r.q-r.rem)}</td><td class="r num">${fmtN(r.rem)}</td><td class="num">${r.st!=null?ft(r.st):'—'}</td><td class="num">${r.en!=null?ft(r.en,true):'<span class="tag ok">已包完</span>'}</td></tr>`).join('')}</tbody></table></div></details>`);
   }
   $('teamSum').innerHTML=sums.join('');$('teamDetail').innerHTML=dets.join('');
@@ -590,6 +597,7 @@ function bind(){
   $('dayPrev').onclick=()=>step(-1);$('dayNext').onclick=()=>step(1);
   const saveF=()=>{const g=id=>[...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value);LS2.set('hs_schf',JSON.stringify({w:g('schWho'),o:g('schOrder')}));renderSch()};
   $('schWho').addEventListener('change',saveF);$('schOrder').addEventListener('change',saveF);$('catQ').addEventListener('input',renderCat);
+  const saveT=()=>{LS2.set('hs_teamf',JSON.stringify({o:$('teamOrd').value,fa:$('teamFa').checked}));renderTeam()};$('teamOrd').addEventListener('change',saveT);$('teamFa').addEventListener('change',saveT);
   $('schClear').onclick=()=>{document.querySelectorAll('#schWho input,#schOrder input').forEach(x=>x.checked=false);saveF()};
   $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
     const get=id=>allEntries.find(x=>x.id===id);
