@@ -159,6 +159,12 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
   body.pr .tag{border:1px solid #888;background:#fff!important}
   body.pr .note{font-size:10px}
 }
+.buy input[type=number],.buy input[type=text],.buy input[type=date]{font:inherit;font-size:14px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:100%;min-width:0}
+.buy input[type=number]{text-align:right}
+.buy td.in{background:color-mix(in srgb,#F2C94C 16%,transparent)}
+.buy .big{font-size:20px;font-weight:700}
+.buy tr.key td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+@media print{body.pr .buy td.in{background:#fff!important}body.pr .buy input{border:0;padding:0;background:#fff!important}body.pr .buy .rowAct,body.pr #buyAdd{display:none!important}}
 </style>
 </head>
 <body>
@@ -181,6 +187,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
       <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
       <button role="tab" id="t-bulb" aria-selected="false" data-p="bulb">燈泡統計</button>
+      <button role="tab" id="t-buy" aria-selected="false" data-p="buy">材料採購</button>
       <button role="tab" id="t-cat" aria-selected="false" data-p="cat">品號對照</button>
     </nav>
   </div>
@@ -269,6 +276,21 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <h2>YAZAWA 品號明細（顆）</h2>
     <div class="tbl"><table><thead id="bulbYazH"></thead><tbody id="bulbYaz"></tbody></table></div>
     <p class="note">用量＝訂單數量 × 每包顆數。例如 FG-1EX2P、FG1E2P 每包 2 顆，FG-1E 3P、FG1E3PY 每包 3 顆，FG-1E/4P、FG-1E/5P、FG1E4P、FG1E5P 每包 1 顆 FG-1E。OHM 新豐包裝的品號也用合欣車台做的 FG-1E，所以計入用量。「車台已做」來自記錄進度裡的車台數量。</p>
+  </section>
+
+  <section role="tabpanel" id="p-buy" class="buy" hidden>
+    <div class="prHead"><h1>合欣電業 E17 銅頭／毛泡 採購需求</h1><div id="prMetaBuy"></div></div>
+    <div class="row noPrint" style="justify-content:space-between"><p class="note" style="margin:0">黃底欄位可以填寫（需用編輯連結打開），填完會自動存檔並重新計算。FG-1E 和 FG-7E 用的 E17 銅頭、毛泡相同，所以合併計算，不分 OHM、YAZAWA。</p><button class="btn" id="buyPrint" type="button">列印</button></div>
+    <h2>採購需求</h2>
+    <div class="tbl"><table><thead><tr><th>項目</th><th class="r">E17 銅頭</th><th class="r">毛泡</th></tr></thead><tbody id="buyRes"></tbody></table></div>
+    <h2>一、訂單需求（FG 顆數）</h2>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th>出貨日</th><th class="r">FG-1E</th><th class="r">FG-7E</th><th class="r">FG 合計</th></tr></thead><tbody id="buyOrd"></tbody></table></div>
+    <h2>二、每顆 FG 的材料用量・三、現有庫存</h2>
+    <div class="tbl"><table><thead><tr><th>項目</th><th class="r">E17 銅頭</th><th class="r">毛泡</th></tr></thead><tbody id="buyCfg"></tbody></table></div>
+    <h2>四、已使用材料的成品 <span class="cust">已做好、但還算在訂單需求裡的成品</span></h2>
+    <div class="tbl"><table><thead><tr><th>成品名稱</th><th class="r">數量</th><th class="r">每個用 E17 銅頭</th><th class="r">每個用毛泡</th><th class="r">已用 E17 銅頭</th><th class="r">已用毛泡</th><th class="rowAct"></th></tr></thead><tbody id="buyFg"></tbody></table></div>
+    <div id="buyAdd" class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px"></div>
+    <p class="note">應採購數量＝FG 總顆數 × 每顆用量 ×（1＋損耗率）－現有庫存－已完成成品用掉的數量；算出來小於 0 就是不用買。訂單顆數跟著「燈泡統計」頁，自動更新。</p>
   </section>
 
   <section role="tabpanel" id="p-cat" hidden>
@@ -450,7 +472,7 @@ function renderVar(){
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
 function recompute(){if(!P)return;S=simulate();renderAll()}
-function renderAll(){renderHeader();renderTeam();renderBulb();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderAll(){renderHeader();renderTeam();renderBulb();renderBuy();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
@@ -593,6 +615,62 @@ function renderBulb(){
     $(bid).innerHTML=['FG-1E','FG-7E'].map(bk=>its.filter(it=>BULB[c][it][0]===bk).map(row).join('')+tot(bk)).join('')+`<tr style="font-weight:600;background:var(--soft);border-top:2px solid var(--ink)"><td colspan="5">${c} FG-1E＋FG-7E 合計</td>${all.map(n=>`<td class="r num">${fmtN(n)}</td>`).join('')}<td class="r num">${fmtN(all.reduce((a,b)=>a+b,0))}</td></tr>`;
   }
 }
+const BUYCFG='buy~cfg';
+function buyData(){const cfg=Object.assign({perCu:1,perMao:1,lossCu:0,lossMao:0,stockCu:'',stockMao:'',stockDate:''},materials[BUYCFG]||{});
+  const fg=Object.values(materials).filter(v=>String(v.id).startsWith('buy~fg~')).sort((a,b)=>String(a.at||'').localeCompare(String(b.at||'')));return{cfg,fg}}
+function fgTotals(){const custOf=o=>(P.orders.find(x=>x.id===o)||{}).cust;const r={};
+  for(const i of P.items){const b=(BULB[custOf(i.order)]||{})[i.item];if(!b)continue;const k=i.order;r[k]=r[k]||{e1:0,e7:0};r[k][b[0]==='FG-1E'?'e1':'e7']+=i.qty*b[1]}return r}
+function renderBuy(){
+  const {cfg,fg}=buyData();const T=fgTotals();const n=v=>+v||0;
+  let a1=0,a7=0;$('buyOrd').innerHTML=P.orders.map(o=>{const t=T[o.id]||{e1:0,e7:0};a1+=t.e1;a7+=t.e7;return`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td>${fdy(o.ship)}</td><td class="r num">${fmtN(t.e1)}</td><td class="r num">${t.e7?fmtN(t.e7):'—'}</td><td class="r num">${fmtN(t.e1+t.e7)}</td></tr>`}).join('')
+    +`<tr style="font-weight:600;background:var(--soft)"><td colspan="2">合計</td><td class="r num">${fmtN(a1)}</td><td class="r num">${fmtN(a7)}</td><td class="r num"><b>${fmtN(a1+a7)}</b></td></tr>`;
+  const FG=a1+a7;
+  const usedCu=fg.reduce((s,r)=>s+n(r.qty)*n(r.cu),0),usedMao=fg.reduce((s,r)=>s+n(r.qty)*n(r.mao),0);
+  const need=(per,loss)=>Math.round(FG*n(per)*(1+n(loss)/100));
+  const nc=need(cfg.perCu,cfg.lossCu),nm=need(cfg.perMao,cfg.lossMao);
+  const netC=nc-n(cfg.stockCu)-usedCu,netM=nm-n(cfg.stockMao)-usedMao;
+  const cell=v=>`<td class="r num">${fmtN(v)}</td>`;const neg=v=>v<0?`<span class="tag ok">庫存足夠，多 ${fmtN(-v)}</span>`:'';
+  $('buyRes').innerHTML=`<tr><td>FG 總需求顆數</td>${cell(FG)}${cell(FG)}</tr><tr><td>訂單需求用量（含損耗）</td>${cell(nc)}${cell(nm)}</tr>
+    <tr><td>減：現有庫存${cfg.stockDate?` <span class="cust">${esc(cfg.stockDate)} 盤點</span>`:''}</td>${cell(n(cfg.stockCu))}${cell(n(cfg.stockMao))}</tr><tr><td>減：已完成成品用掉</td>${cell(usedCu)}${cell(usedMao)}</tr>
+    <tr><td>淨需求</td>${cell(netC)}${cell(netM)}</tr>
+    <tr class="key"><td><b>應採購數量</b></td><td class="r num big">${fmtN(Math.max(0,netC))} ${neg(netC)}</td><td class="r num big">${fmtN(Math.max(0,netM))} ${neg(netM)}</td></tr>`;
+  if($('p-buy').contains(document.activeElement)&&document.activeElement.tagName==='INPUT'){
+    // 正在輸入時只更新計算結果，不重畫輸入框
+    for(const r of fg){const tr=document.querySelector(`#buyFg tr[data-id="${r.id}"]`);if(tr){tr.querySelector('[data-o=cu]').textContent=fmtN(n(r.qty)*n(r.cu));tr.querySelector('[data-o=mao]').textContent=fmtN(n(r.qty)*n(r.mao))}}
+    return}
+  const dis=canWrite?'':' disabled';
+  const inp=(k,v,step,suffix)=>`<td class="r in"><span style="display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;width:100%"><input type="number" min="0" step="${step}" data-cfg="${k}" value="${esc(v)}"${dis} style="max-width:140px">${suffix||''}</span></td>`;
+  $('buyCfg').innerHTML=`<tr><td>每顆 FG-1E／FG-7E 用量</td>${inp('perCu',cfg.perCu,'any')}${inp('perMao',cfg.perMao,'any')}</tr>
+    <tr><td>損耗率</td>${inp('lossCu',cfg.lossCu,'any','%')}${inp('lossMao',cfg.lossMao,'any','%')}</tr>
+    <tr><td>現有庫存</td>${inp('stockCu',cfg.stockCu,'1')}${inp('stockMao',cfg.stockMao,'1')}</tr>
+    <tr><td>盤點日期</td><td class="in" colspan="2"><input type="date" data-cfg="stockDate" value="${esc(cfg.stockDate)}"${dis} style="max-width:180px"></td></tr>`;
+  $('buyFg').innerHTML=fg.length?fg.map(r=>`<tr data-id="${esc(r.id)}"><td class="in"><input type="text" data-f="name" value="${esc(r.name||'')}"${dis}></td><td class="in"><input type="number" min="0" step="1" data-f="qty" value="${esc(r.qty??'')}"${dis}></td><td class="in"><input type="number" min="0" step="any" data-f="cu" value="${esc(r.cu??'')}"${dis}></td><td class="in"><input type="number" min="0" step="any" data-f="mao" value="${esc(r.mao??'')}"${dis}></td><td class="r num" data-o="cu">${fmtN(n(r.qty)*n(r.cu))}</td><td class="r num" data-o="mao">${fmtN(n(r.qty)*n(r.mao))}</td><td class="rowAct">${canWrite?`<button class="btn ghost" type="button" data-fdel="${esc(r.id)}">刪除</button>`:''}</td></tr>`).join('')
+    +`<tr style="font-weight:600;background:var(--soft)"><td>合計</td><td class="r num">${fmtN(fg.reduce((s,r)=>s+n(r.qty),0))}</td><td></td><td></td><td class="r num">${fmtN(usedCu)}</td><td class="r num">${fmtN(usedMao)}</td><td class="rowAct"></td></tr>`
+    :'<tr><td colspan="7" class="empty">還沒有填寫成品。</td></tr>';
+  $('buyAdd').innerHTML=canWrite?`<label style="flex:2 1 200px">成品名稱<input type="text" id="bfName" placeholder="例如：FG-1E（1475608061 已做好）"></label><label style="flex:1 1 100px">數量<input type="number" id="bfQty" min="0" step="1"></label><label style="flex:1 1 90px">每個用 E17 銅頭<input type="number" id="bfCu" min="0" step="any" value="1"></label><label style="flex:1 1 90px">每個用毛泡<input type="number" id="bfMao" min="0" step="any" value="1"></label><button class="btn" type="button" id="bfAdd">新增成品</button>`:'';
+}
+function bindBuy(){
+  const saveCfg=async()=>{if(!db||!canWrite)return;const {cfg}=buyData();const d={};for(const k of ['perCu','perMao','lossCu','lossMao','stockCu','stockMao','stockDate'])d[k]=cfg[k];
+    document.querySelectorAll('#buyCfg [data-cfg]').forEach(x=>{d[x.dataset.cfg]=x.value});d.at=new Date().toISOString();d.by=myId||'';
+    materials[BUYCFG]={...d,id:BUYCFG};renderBuy();try{await db.collection('materials').doc(BUYCFG).set(d)}catch(e){alert('存檔失敗，請再試一次。')}};
+  const saveRow=async tr=>{if(!db||!canWrite)return;const id=tr.dataset.id;const d={...(materials[id]||{})};delete d.id;
+    tr.querySelectorAll('[data-f]').forEach(x=>{d[x.dataset.f]=x.dataset.f==='name'?x.value.trim():x.value});d.editedAt=new Date().toISOString();d.by=myId||'';
+    materials[id]={...d,id};renderBuy();try{await db.collection('materials').doc(id).set(d)}catch(e){alert('存檔失敗，請再試一次。')}};
+  $('p-buy').addEventListener('input',ev=>{if(ev.target.closest('#buyCfg,#buyFg'))renderBuyLive(ev.target)});
+  $('p-buy').addEventListener('change',ev=>{if(ev.target.closest('#buyCfg'))saveCfg();else{const tr=ev.target.closest('#buyFg tr[data-id]');if(tr)saveRow(tr)}});
+  $('p-buy').addEventListener('click',async ev=>{
+    const del=ev.target.closest('[data-fdel]');
+    if(del&&canWrite){const id=del.dataset.fdel;const r=materials[id]||{};if(!confirm(`刪除「${r.name||'這一列'}」？`))return;delete materials[id];renderBuy();try{await db.collection('materials').doc(id).delete()}catch(e){alert('刪除失敗，請再試一次。')}return}
+    if(ev.target.id==='bfAdd'&&canWrite){const name=$('bfName').value.trim(),qty=$('bfQty').value;if(!name||!(+qty>0)){alert('請填成品名稱和數量。');return}
+      const id='buy~fg~'+Date.now().toString(36);const d={name,qty,cu:$('bfCu').value,mao:$('bfMao').value,at:new Date().toISOString(),by:myId||''};
+      materials[id]={...d,id};renderBuy();try{await db.collection('materials').doc(id).set(d)}catch(e){alert('存檔失敗，請再試一次。')}}});
+  $('buyPrint').addEventListener('click',()=>{const {cfg}=buyData();$('prMetaBuy').textContent=`${cfg.stockDate?'庫存盤點 '+cfg.stockDate+'・':''}列印時間 ${nowTxt()}`;doPrint('p-buy')});
+}
+// 輸入時即時預覽計算結果（尚未存檔）
+function renderBuyLive(el){const id=BUYCFG;
+  if(el.dataset.cfg){materials[id]={...(materials[id]||{id}),[el.dataset.cfg]:el.value}}
+  else{const tr=el.closest('tr[data-id]');if(tr&&el.dataset.f){const k=tr.dataset.id;materials[k]={...(materials[k]||{id:k}),[el.dataset.f]:el.value}}}
+  renderBuy()}
 function renderCat(){
   const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
   const hit=r=>!q||[r.item,r.name,r.spec,r.sup,r.barcode].some(v=>v&&String(v).toLowerCase().includes(q));
@@ -677,6 +755,7 @@ function bind(){
     $('prMeta').textContent=`進度記到 ${$('asof').value||'—'}・訂單：${os.options[os.selectedIndex].text}${$('teamFa').checked?'（含芳負責的品號）':''}・列印時間 ${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`;
     document.querySelectorAll('#teamDetail details').forEach(d=>d.open=true);
     doPrint('p-team')});
+  bindBuy();
   $('bulbPrint').addEventListener('click',()=>{$('prMetaBulb').textContent=`車台已做記到 ${$('asof').value||'—'}・列印時間 ${nowTxt()}`;doPrint('p-bulb')});
   $('catPrint').addEventListener('click',()=>{const q=($('catQ').value||'').trim();
     $('prMetaCat').textContent=`${q?'搜尋：'+q+'・':''}${$('catN').textContent}・列印時間 ${nowTxt()}`;doPrint('p-cat')});
