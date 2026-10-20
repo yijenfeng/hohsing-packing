@@ -140,23 +140,24 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
 .prHead{display:none}
 @media print{
   @page{size:A4 landscape;margin:10mm}
-  body.pr-team{background:#fff!important;color:#000!important;font-size:11px}
-  body.pr-team *{color:#000!important;box-shadow:none!important}
-  body.pr-team header,body.pr-team #loadErr,body.pr-team main>section:not(#p-team),body.pr-team .noPrint{display:none!important}
-  body.pr-team #p-team{display:block!important}
-  body.pr-team .prHead{display:block;margin:0 0 8px}
-  body.pr-team .prHead h1{font-size:18px;margin:0 0 2px}
-  body.pr-team .wrap{max-width:none;padding:0}
-  body.pr-team .tbl{overflow:visible;border:1px solid #999;border-radius:0;background:#fff}
-  body.pr-team th{position:static;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body.pr-team th,body.pr-team td{padding:3px 6px;border-bottom:1px solid #ccc}
-  body.pr-team tr{break-inside:avoid}
-  body.pr-team thead{display:table-header-group}
-  body.pr-team details.team{border:0;background:#fff;break-inside:auto;margin-top:6px}
-  body.pr-team details.team>summary{list-style:none;padding:4px 0;break-after:avoid}
-  body.pr-team details.team>summary::-webkit-details-marker{display:none}
-  body.pr-team .tag{border:1px solid #888;background:#fff!important}
-  body.pr-team .note{font-size:10px}
+  body.pr{background:#fff!important;color:#000!important;font-size:11px}
+  body.pr *{color:#000!important;box-shadow:none!important}
+  body.pr header,body.pr #loadErr,body.pr main>section:not(.prOn),body.pr .noPrint{display:none!important}
+  body.pr main>section.prOn{display:block!important}
+  body.pr h2{break-after:avoid;margin:10px 0 4px;font-size:14px}
+  body.pr .prHead{display:block;margin:0 0 8px}
+  body.pr .prHead h1{font-size:18px;margin:0 0 2px}
+  body.pr .wrap{max-width:none;padding:0}
+  body.pr .tbl{overflow:visible;border:1px solid #999;border-radius:0;background:#fff}
+  body.pr th{position:static;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.pr th,body.pr td{padding:3px 6px;border-bottom:1px solid #ccc}
+  body.pr tr{break-inside:avoid}
+  body.pr thead{display:table-header-group}
+  body.pr details.team{border:0;background:#fff;break-inside:auto;margin-top:6px}
+  body.pr details.team>summary{list-style:none;padding:4px 0;break-after:avoid}
+  body.pr details.team>summary::-webkit-details-marker{display:none}
+  body.pr .tag{border:1px solid #888;background:#fff!important}
+  body.pr .note{font-size:10px}
 }
 </style>
 </head>
@@ -256,7 +257,8 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="tbl"><table><thead><tr><th>狀態</th><th>料齊期限</th><th>開包日</th><th>訂單</th><th>品號</th><th class="r">數量</th><th>已到料</th></tr></thead><tbody id="mat"></tbody></table></div>
   </section>
   <section role="tabpanel" id="p-cat" hidden>
-    <div class="row"><label for="catQ" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">搜尋<input type="search" id="catQ" placeholder="品號、規格、品名或條碼" style="width:220px;font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><span class="cust" id="catN"></span></div>
+    <div class="prHead"><h1>合欣電業 品號對照</h1><div id="prMetaCat"></div></div>
+    <div class="row noPrint" style="justify-content:space-between"><span><label for="catQ" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">搜尋<input type="search" id="catQ" placeholder="品號、規格、品名或條碼" style="width:220px;font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><span class="cust" id="catN"></span></span><button class="btn" id="catPrint" type="button">列印</button></div>
     <h2>OHM</h2>
     <div class="tbl"><table><thead><tr><th>品號</th><th>規格說明</th><th>包裝方式</th><th>包裝地點</th><th class="r">1475608061</th><th class="r">1475608062</th><th class="r">1475608063</th><th class="r">合計</th></tr></thead><tbody id="catOhm"></tbody></table></div>
     <h2>YAZAWA</h2>
@@ -542,6 +544,8 @@ function renderTeam(){
   }
   $('teamSum').innerHTML=sums.join('');$('teamDetail').innerHTML=dets.join('');
 }
+function nowTxt(){const n=new Date(),pad=x=>String(x).padStart(2,'0');return `${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`}
+function doPrint(id){document.querySelectorAll('section.prOn').forEach(x=>x.classList.remove('prOn'));$(id).classList.add('prOn');document.body.classList.add('pr');setTimeout(()=>window.print(),50)}
 function renderCat(){
   const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
   const hit=r=>!q||[r.item,r.name,r.spec,r.sup,r.barcode].some(v=>v&&String(v).toLowerCase().includes(q));
@@ -625,8 +629,10 @@ function bind(){
     const os=$('teamOrd');const pad=n=>String(n).padStart(2,'0');const n=new Date();
     $('prMeta').textContent=`進度記到 ${$('asof').value||'—'}・訂單：${os.options[os.selectedIndex].text}${$('teamFa').checked?'（含芳負責的品號）':''}・列印時間 ${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ${pad(n.getHours())}:${pad(n.getMinutes())}`;
     document.querySelectorAll('#teamDetail details').forEach(d=>d.open=true);
-    document.body.classList.add('pr-team');setTimeout(()=>window.print(),50)});
-  window.addEventListener('afterprint',()=>document.body.classList.remove('pr-team'));$('teamFa').addEventListener('change',saveT);
+    doPrint('p-team')});
+  $('catPrint').addEventListener('click',()=>{const q=($('catQ').value||'').trim();
+    $('prMetaCat').textContent=`${q?'搜尋：'+q+'・':''}${$('catN').textContent}・列印時間 ${nowTxt()}`;doPrint('p-cat')});
+  window.addEventListener('afterprint',()=>{document.body.classList.remove('pr');document.querySelectorAll('section.prOn').forEach(x=>x.classList.remove('prOn'))});$('teamFa').addEventListener('change',saveT);
   $('schClear').onclick=()=>{document.querySelectorAll('#schWho input,#schOrder input').forEach(x=>x.checked=false);saveF()};
   $('entries').addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b||!db)return;const now=new Date().toISOString();
     const get=id=>allEntries.find(x=>x.id===id);
