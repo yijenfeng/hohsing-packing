@@ -263,7 +263,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <h2>客戶合計（顆）</h2>
     <div class="tbl"><table><thead><tr><th>客戶</th><th class="r">FG-1E</th><th class="r">其中新豐包裝</th><th class="r">FG-7E</th><th class="r">合計</th></tr></thead><tbody id="bulbCust"></tbody></table></div>
     <h2>各訂單（顆）</h2>
-    <div class="tbl"><table><thead><tr><th>訂單</th><th>出貨日</th><th class="r">FG-1E 用量</th><th class="r">其中新豐</th><th class="r">FG-1E 車台排程</th><th class="r">FG-1E 車台已做</th><th class="r">FG-7E 用量</th><th class="r">FG-7E 車台已做</th><th>備註</th></tr></thead><tbody id="bulbOrd"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>訂單</th><th>出貨日</th><th class="r">FG-1E 用量</th><th class="r">其中新豐</th><th class="r">FG-1E 車台排程</th><th class="r">FG-1E 車台已做</th><th class="r">FG-7E 用量</th><th class="r">FG-7E 車台已做</th><th class="r">FG-1E＋FG-7E</th><th>備註</th></tr></thead><tbody id="bulbOrd"></tbody></table></div>
     <h2>OHM 品號明細（顆）</h2>
     <div class="tbl"><table><thead id="bulbOhmH"></thead><tbody id="bulbOhm"></tbody></table></div>
     <h2>YAZAWA 品號明細（顆）</h2>
@@ -572,11 +572,15 @@ function renderBulb(){
   const n0=v=>v?fmtN(v):'—';
   $('bulbCust').innerHTML=['OHM','YAZAWA',null].map(c=>{const f=u=>!c||custOf(u.order)===c;const e1=sum(u=>f(u)&&u.bulb==='FG-1E'),xf=sum(u=>f(u)&&u.bulb==='FG-1E'&&u.loc==='新豐'),e7=sum(u=>f(u)&&u.bulb==='FG-7E');
     const tag=c?esc(c):'合計';return`<tr${c?'':' style="font-weight:600"'}><td>${tag}</td><td class="r num">${fmtN(e1)}</td><td class="r num">${n0(xf)}</td><td class="r num">${fmtN(e7)}</td><td class="r num"><b>${fmtN(e1+e7)}</b></td></tr>`}).join('');
-  $('bulbOrd').innerHTML=P.orders.map(o=>{const e1=sum(u=>u.order===o.id&&u.bulb==='FG-1E'),xf=sum(u=>u.order===o.id&&u.bulb==='FG-1E'&&u.loc==='新豐'),e7=sum(u=>u.order===o.id&&u.bulb==='FG-7E');
+  const ordRow=o=>{const e1=sum(u=>u.order===o.id&&u.bulb==='FG-1E'),xf=sum(u=>u.order===o.id&&u.bulb==='FG-1E'&&u.loc==='新豐'),e7=sum(u=>u.order===o.id&&u.bulb==='FG-7E');
     const sch=P.tasks.filter(t=>t.kind==='lathe'&&t.order===o.id&&t.item==='FG1E').reduce((a,t)=>a+t.qty,0);
     const d1=lathe[o.id+'|FG1E']||0,d7=lathe[o.id+'|FG7E']||0;
     const note=e1-sch>0?`庫存已有 ${fmtN(e1-sch)}`:'';
-    return`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td>${fdy(o.ship)}</td><td class="r num"><b>${fmtN(e1)}</b></td><td class="r num">${n0(xf)}</td><td class="r num">${fmtN(sch)}</td><td class="r num">${n0(d1)}</td><td class="r num"><b>${n0(e7)}</b></td><td class="r num">${n0(d7)}</td><td>${note}</td></tr>`}).join('');
+    return{h:`<tr><td class="num">${esc(o.id)} <span class="cust">${esc(o.cust)}</span></td><td>${fdy(o.ship)}</td><td class="r num"><b>${fmtN(e1)}</b></td><td class="r num">${n0(xf)}</td><td class="r num">${fmtN(sch)}</td><td class="r num">${n0(d1)}</td><td class="r num"><b>${n0(e7)}</b></td><td class="r num">${n0(d7)}</td><td class="r num">${fmtN(e1+e7)}</td><td>${note}</td></tr>`,v:[e1,xf,sch,d1,e7,d7,e1+e7]}};
+  const subRow=(lab,vs,strong)=>{const t=vs.reduce((a,v)=>a.map((x,i)=>x+v[i]),[0,0,0,0,0,0,0]);
+    return`<tr style="font-weight:600;background:var(--soft)${strong?';border-top:2px solid var(--ink)':''}"><td colspan="2">${lab}</td>${t.map((n,i)=>`<td class="r num">${i===0||i===4||i===6?'<b>'+fmtN(n)+'</b>':n0(n)}</td>`).join('')}<td></td></tr>`};
+  {const all=[];let h='';for(const c of ['OHM','YAZAWA']){const rs=P.orders.filter(o=>o.cust===c).map(ordRow);all.push(...rs);h+=rs.map(r=>r.h).join('')+subRow(c+' 小計',rs.map(r=>r.v))}
+   $('bulbOrd').innerHTML=h+subRow('全部合計',all.map(r=>r.v),true)}
   const nm=it=>{const c=(P.catalog||[]).find(r=>r.item===it);return c?(c.name||c.spec||''):''};
   for(const [c,hid,bid] of [['OHM','bulbOhmH','bulbOhm'],['YAZAWA','bulbYazH','bulbYaz']]){
     const os=P.orders.filter(o=>o.cust===c);const its=Object.keys(BULB[c]).filter(it=>use.some(u=>u.item===it&&custOf(u.order)===c));
@@ -585,7 +589,8 @@ function renderBulb(){
     const row=it=>{const b=BULB[c][it];const v=os.map(o=>{const u=use.find(u=>u.order===o.id&&u.item===it);return u?u.n:0});const loc=(use.find(u=>u.item===it&&custOf(u.order)===c)||{}).loc;
       return`<tr><td class="num">${esc(it)}</td><td>${esc(nm(it))}</td><td>${b[0]}</td><td class="r num">${b[1]}</td><td>${loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${v.map(n=>`<td class="r num">${n0(n)}</td>`).join('')}<td class="r num"><b>${fmtN(v.reduce((a,b)=>a+b,0))}</b></td></tr>`};
     const tot=bk=>{const v=os.map(o=>sum(u=>u.order===o.id&&u.bulb===bk));return`<tr style="font-weight:600;background:var(--soft)"><td colspan="5">${bk} 小計</td>${v.map(n=>`<td class="r num">${n0(n)}</td>`).join('')}<td class="r num">${fmtN(v.reduce((a,b)=>a+b,0))}</td></tr>`};
-    $(bid).innerHTML=['FG-1E','FG-7E'].map(bk=>its.filter(it=>BULB[c][it][0]===bk).map(row).join('')+tot(bk)).join('');
+    const all=os.map(o=>sum(u=>u.order===o.id));
+    $(bid).innerHTML=['FG-1E','FG-7E'].map(bk=>its.filter(it=>BULB[c][it][0]===bk).map(row).join('')+tot(bk)).join('')+`<tr style="font-weight:600;background:var(--soft);border-top:2px solid var(--ink)"><td colspan="5">${c} FG-1E＋FG-7E 合計</td>${all.map(n=>`<td class="r num">${fmtN(n)}</td>`).join('')}<td class="r num">${fmtN(all.reduce((a,b)=>a+b,0))}</td></tr>`;
   }
 }
 function renderCat(){
