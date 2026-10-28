@@ -705,7 +705,7 @@ function renderSpec(){
   const n0=v=>v?fmtN(v):'—';
   const specs=[...new Set(use.map(u=>u.spec))];
   const tot=sp=>use.filter(u=>u.spec===sp).reduce((a,u)=>a+u.n,0);
-  specs.sort((a,b)=>tot(b)-tot(a)||a.localeCompare(b));
+  specs.sort((a,b)=>a.localeCompare(b,'en',{numeric:true,sensitivity:'base'}));
   const multi=os.length>1;
   $('specSumH').innerHTML=`<tr><th>規格</th>${multi?os.map(o=>`<th class="r">${esc(o.id)}<br><span class="cust">${esc(o.cust)}</span></th>`).join(''):''}<th class="r">需求合計</th></tr>`;
   const all=os.map(o=>use.filter(u=>u.order===o.id).reduce((a,u)=>a+u.n,0));
