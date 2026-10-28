@@ -275,7 +275,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="tbl"><table><thead id="specSumH"></thead><tbody id="specSum"></tbody></table></div>
     <h2>品號明細（pcs）</h2>
     <div class="tbl"><table><thead id="specDetH"></thead><tbody id="specDet"></tbody></table></div>
-    <p class="note">需求 pcs＝訂單數量 × 每個品號用到該規格的顆數（×1、×2、×3…）。例如 04-1305 LB-T0205-W/2P 每包 2 顆 T20,E12,5W 白，訂單 7,800 包 × 2 = 15,600 pcs。規格依「品號對照」；YAZAWA 品號依品號名稱判斷規格與顆數。FG-1E/4P、FG1E4P 一包含 FG-1E ×1＋FG-4P ×1；FG-1E/5P、FG1E5P 含 FG-1E ×1＋FG-5P ×1；FG4P5P 含 FG-4P ×1＋FG-5P ×1；FG1E4P1CT 含 FG-1E、FG-4P、T20,5W Natsume 各 1 顆；FG1E5P1CT 含 FG-1E、FG-5P、T20,5W Natsume 各 1 顆，這些品號會同時列在兩個規格下。新豐包裝的品號也列入。</p>
+    <p class="note">需求 pcs＝訂單數量 × 每個品號用到該規格的顆數（×1、×2、×3…）。例如 04-1305 LB-T0205-W/2P 每包 2 顆 T20,E12,5W 白，訂單 7,800 包 × 2 = 15,600 pcs。規格依「品號對照」；YAZAWA 品號依品號名稱判斷規格與顆數。FG-1E/4P、FG1E4P 一包含 FG-1E ×1＋FG-4P ×1；FG-1E/5P、FG1E5P 含 FG-1E ×1＋FG-5P ×1；FG4P5P 含 FG-4P ×1＋FG-5P ×1；FG1E2P1CT 含 FG-1E ×2＋T20,5W Natsume 白 ×1；FG1E4P1CT 含 FG-1E、FG-4P、T20,5W Natsume 各 1 顆；FG1E5P1CT 含 FG-1E、FG-5P、T20,5W Natsume 各 1 顆，這些品號會同時列在兩個規格下。新豐包裝的品號也列入。</p>
   </section>
   <section role="tabpanel" id="p-bulb" hidden>
     <div class="prHead"><h1>合欣電業 FG-1E／FG-7E 用量統計</h1><div id="prMetaBulb"></div></div>
@@ -691,7 +691,7 @@ const SPEC={OHM:{'04-1305':['T20,E12,5W 白',2],'04-1395':['T20,E12,5W 清',2],'
   '04-6402':['G40,E26,7W,白',1],'04-6414':['S-35,E17,25W,砂',1],'04-6415':['S-35,E17,40W,砂',1],'04-6475':['T20,E12,15W,清',1],'04-6487':['G40,E26,7W,清',1],'04-6489':['G50,E26,10W,清',1],
   '04-6543':['FG-1E',2],'04-6544':['T20,E12,5W 白',2],'04-6633':['FG-1P',1],'04-6634':['FG-4P',1],'04-6635':['FG-5P',1],'04-6637':['FG-1E',2],'04-6665':[['FG-1E',1],['FG-4P',1]],'04-6666':[['FG-1E',1],['FG-5P',1]],
   '04-6825':['T20,E12,5W 白',2],'04-9317':['T20,E12,5W 白',1],'04-9326':['FG-1E',1],'04-9328':['FG-7E',1],'06-0567':['T20,5W內白長壽命',1],'06-0568':['T20,5W透明長壽命',1]},
-  YAZAWA:{FG1E2P:['FG-1E',2],FG1E2P1CT:['FG-1E',2],FG1E3PY:['FG-1E',3],FG1E4P:[['FG-1E',1],['FG-4P',1]],FG1E4P1CT:[['FG-1E',1],['FG-4P',1],['T20,5W Natsume',1]],FG1E5P:[['FG-1E',1],['FG-5P',1]],FG1E5P1CT:[['FG-1E',1],['FG-5P',1],['T20,5W Natsume',1]],
+  YAZAWA:{FG1E2P:['FG-1E',2],FG1E2P1CT:[['FG-1E',2],['T20,5W Natsume 白',1]],FG1E3PY:['FG-1E',3],FG1E4P:[['FG-1E',1],['FG-4P',1]],FG1E4P1CT:[['FG-1E',1],['FG-4P',1],['T20,5W Natsume',1]],FG1E5P:[['FG-1E',1],['FG-5P',1]],FG1E5P1CT:[['FG-1E',1],['FG-5P',1],['T20,5W Natsume',1]],
   FG1PB:['FG-1P',1],FG4P1P:['FG-4P',1],FG4P2P:['FG-4P',2],FG4P5P:[['FG-4P',1],['FG-5P',1]],FG5P1P:['FG-5P',1],FG5P2P:['FG-5P',2],FG7E1P:['FG-7E',1],FG7EB:['FG-7E',1]}};
 function renderSpec(){
   const sel=$('specOrd');if(sel.options.length<=1)sel.innerHTML='<option value="">全部訂單</option>'+P.orders.map(o=>`<option value="${esc(o.id)}">${esc(o.id)} ${esc(o.cust)}</option>`).join('');
