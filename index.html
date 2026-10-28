@@ -275,7 +275,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <div class="tbl"><table><thead id="specSumH"></thead><tbody id="specSum"></tbody></table></div>
     <h2>品號明細（pcs）</h2>
     <div class="tbl"><table><thead id="specDetH"></thead><tbody id="specDet"></tbody></table></div>
-    <p class="note">需求 pcs＝訂單數量 × 每個品號用到該規格的顆數（×1、×2、×3…）。例如 04-1305 LB-T0205-W/2P 每包 2 顆 T20,E12,5W 白，訂單 7,800 包 × 2 = 15,600 pcs。規格依「品號對照」；YAZAWA 品號依品號名稱判斷規格與顆數。新豐包裝的品號也列入。</p>
+    <p class="note">需求 pcs＝訂單數量 × 每個品號用到該規格的顆數（×1、×2、×3…）。例如 04-1305 LB-T0205-W/2P 每包 2 顆 T20,E12,5W 白，訂單 7,800 包 × 2 = 15,600 pcs。規格依「品號對照」；YAZAWA 品號依品號名稱判斷規格與顆數。FG-1E/4P、FG1E4P 一包含 FG-1E ×1＋FG-4P ×1；FG-1E/5P、FG1E5P 含 FG-1E ×1＋FG-5P ×1；FG4P5P 含 FG-4P ×1＋FG-5P ×1，這些品號會同時列在兩個規格下。新豐包裝的品號也列入。</p>
   </section>
   <section role="tabpanel" id="p-bulb" hidden>
     <div class="prHead"><h1>合欣電業 FG-1E／FG-7E 用量統計</h1><div id="prMetaBulb"></div></div>
@@ -684,21 +684,22 @@ function renderBuyLive(el){const id=BUYCFG;
   if(el.dataset.cfg){materials[id]={...(materials[id]||{id}),[el.dataset.cfg]:el.value}}
   else{const tr=el.closest('tr[data-id]');if(tr&&el.dataset.f){const k=tr.dataset.id;materials[k]={...(materials[k]||{id:k}),[el.dataset.f]:el.value}}}
   renderBuy()}
-// 每個品號用到的規格與顆數 [規格, 每包顆數]
+// 每個品號用到的規格與顆數 [規格, 每包顆數]；一包含兩種規格的寫成 [[規格,顆數],[規格,顆數]]
 const SPEC={OHM:{'04-1305':['T20,E12,5W 白',2],'04-1395':['T20,E12,5W 清',2],'04-1396':['T22,E17,15W,清',1],'04-1397':['T22,E17,15W,砂',1],'04-1398':['T20,E12,5W 白',2],
   '04-1411':['FG-1E',2],'04-1469':['T20,E12,5W 白',2],'04-1470':['T20,E12,5W 白',3],'04-1473':['FG-1E',2],'04-1474':['FG-1E',3],'04-1918':['T20,E12,5W 白',2],'04-1919':['FG-1E',2],
   '04-6334':['C-7,E12,5W,白',2],'04-6355':['S-35,E17,25W,清',1],'04-6356':['S-35,E17,40W,清',1],'04-6369':['G40,E26,7W,砂',1],'04-6376':['C-7,E12,5W,清',2],'04-6401':['T20,E12,10W,清',1],
-  '04-6402':['G40,E26,7W,白',1],'04-6414':['S-35,E17,25W,砂',1],'04-6415':['S-35,E17,40W,砂',1],'04-6475':['T20,E12,15W,清',1],'04-6487':['G40,7W,清',1],'04-6489':['G50,E26,10W,清',1],
-  '04-6543':['FG-1E',2],'04-6544':['T20,E12,5W 白',2],'04-6633':['FG-1P',1],'04-6634':['FG-4P',1],'04-6635':['FG-5P',1],'04-6637':['FG-1E',2],'04-6665':['FG-1E',1],'04-6666':['FG-1E',1],
+  '04-6402':['G40,E26,7W,白',1],'04-6414':['S-35,E17,25W,砂',1],'04-6415':['S-35,E17,40W,砂',1],'04-6475':['T20,E12,15W,清',1],'04-6487':['G40,E26,7W,清',1],'04-6489':['G50,E26,10W,清',1],
+  '04-6543':['FG-1E',2],'04-6544':['T20,E12,5W 白',2],'04-6633':['FG-1P',1],'04-6634':['FG-4P',1],'04-6635':['FG-5P',1],'04-6637':['FG-1E',2],'04-6665':[['FG-1E',1],['FG-4P',1]],'04-6666':[['FG-1E',1],['FG-5P',1]],
   '04-6825':['T20,E12,5W 白',2],'04-9317':['T20,E12,5W 白',1],'04-9326':['FG-1E',1],'04-9328':['FG-7E',1],'06-0567':['T20,5W內白長壽命',1],'06-0568':['T20,5W透明長壽命',1]},
-  YAZAWA:{FG1E2P:['FG-1E',2],FG1E2P1CT:['FG-1E',2],FG1E3PY:['FG-1E',3],FG1E4P:['FG-1E',1],FG1E4P1CT:['FG-1E',1],FG1E5P:['FG-1E',1],FG1E5P1CT:['FG-1E',1],
-  FG1PB:['FG-1P',1],FG4P1P:['FG-4P',1],FG4P2P:['FG-4P',2],FG4P5P:['FG-4P',5],FG5P1P:['FG-5P',1],FG5P2P:['FG-5P',2],FG7E1P:['FG-7E',1],FG7EB:['FG-7E',1]}};
+  YAZAWA:{FG1E2P:['FG-1E',2],FG1E2P1CT:['FG-1E',2],FG1E3PY:['FG-1E',3],FG1E4P:[['FG-1E',1],['FG-4P',1]],FG1E4P1CT:[['FG-1E',1],['FG-4P',1]],FG1E5P:[['FG-1E',1],['FG-5P',1]],FG1E5P1CT:[['FG-1E',1],['FG-5P',1]],
+  FG1PB:['FG-1P',1],FG4P1P:['FG-4P',1],FG4P2P:['FG-4P',2],FG4P5P:[['FG-4P',1],['FG-5P',1]],FG5P1P:['FG-5P',1],FG5P2P:['FG-5P',2],FG7E1P:['FG-7E',1],FG7EB:['FG-7E',1]}};
 function renderSpec(){
   const sel=$('specOrd');if(sel.options.length<=1)sel.innerHTML='<option value="">全部訂單</option>'+P.orders.map(o=>`<option value="${esc(o.id)}">${esc(o.id)} ${esc(o.cust)}</option>`).join('');
   const f=sel.value;const os=P.orders.filter(o=>!f||o.id===f);
   const custOf=o=>(P.orders.find(x=>x.id===o)||{}).cust;
   const nm=(c,it)=>{const r=(P.catalog||[]).find(r=>r.cust===c&&r.item===it);return r?r.name:''};
-  const use=P.items.filter(i=>os.some(o=>o.id===i.order)).map(i=>{const c=custOf(i.order);const m=(SPEC[c]||{})[i.item]||[((P.catalog||[]).find(r=>r.item===i.item)||{}).spec||'（未設定）',1];return{...i,cust:c,spec:m[0],per:m[1],n:i.qty*m[1]}});
+  const parts=m=>Array.isArray(m[0])?m:[m];
+  const use=P.items.filter(i=>os.some(o=>o.id===i.order)).flatMap(i=>{const c=custOf(i.order);const ps=parts((SPEC[c]||{})[i.item]||[((P.catalog||[]).find(r=>r.item===i.item)||{}).spec||'（未設定）',1]);return ps.map(m=>({...i,cust:c,spec:m[0],per:m[1],n:i.qty*m[1],also:ps.filter(x=>x[0]!==m[0]).map(x=>x[0]+' ×'+x[1]).join('、')}))});
   const n0=v=>v?fmtN(v):'—';
   const specs=[...new Set(use.map(u=>u.spec))];
   const tot=sp=>use.filter(u=>u.spec===sp).reduce((a,u)=>a+u.n,0);
@@ -713,7 +714,7 @@ function renderSpec(){
   const cols=(multi?os.length:0)+6;
   $('specDet').innerHTML=specs.map(sp=>{const us=use.filter(u=>u.spec===sp);const its=[...new Set(us.map(u=>u.cust+'|'+u.item))].sort((a,b)=>a.localeCompare(b));
     const rows=its.map(k=>{const [c,it]=k.split('|');const r=us.filter(u=>u.cust===c&&u.item===it);const q=r.reduce((a,u)=>a+u.qty,0),per=r[0].per;
-      return`<tr><td class="num">${esc(it)} <span class="cust">${esc(c)}</span></td><td>${esc(nm(c,it))}</td><td>${r[0].loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${multi?os.map(o=>{const x=r.find(u=>u.order===o.id);return`<td class="r num">${x?fmtN(x.qty):'—'}</td>`}).join(''):''}<td class="r num">${fmtN(q)}</td><td class="r num">×${per}</td><td class="r num"><b>${fmtN(q*per)}</b></td></tr>`}).join('');
+      return`<tr><td class="num">${esc(it)} <span class="cust">${esc(c)}</span></td><td>${esc(nm(c,it))}${r[0].also?`<br><span class="cust">同一包另含 ${esc(r[0].also)}</span>`:''}</td><td>${r[0].loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${multi?os.map(o=>{const x=r.find(u=>u.order===o.id);return`<td class="r num">${x?fmtN(x.qty):'—'}</td>`}).join(''):''}<td class="r num">${fmtN(q)}</td><td class="r num">×${per}</td><td class="r num"><b>${fmtN(q*per)}</b></td></tr>`}).join('');
     return`<tr style="background:var(--soft)"><td colspan="${cols}" style="font-weight:600">${esc(sp)}</td></tr>`+rows
       +`<tr style="font-weight:600"><td colspan="${cols-1}" style="text-align:right">${esc(sp)} 小計</td><td class="r num">${fmtN(tot(sp))}</td></tr>`}).join('');
 }
