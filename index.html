@@ -186,6 +186,7 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
       <button role="tab" id="t-day" aria-selected="false" data-p="day">每日工作</button>
       <button role="tab" id="t-sch" aria-selected="false" data-p="sch">排程</button>
       <button role="tab" id="t-mat" aria-selected="false" data-p="mat">料齊</button>
+      <button role="tab" id="t-short" aria-selected="false" data-p="short">缺料備註</button>
       <button role="tab" id="t-bulb" aria-selected="false" data-p="bulb">FG1E/7E統計</button>
       <button role="tab" id="t-spec" aria-selected="false" data-p="spec">規格需求</button>
       <button role="tab" id="t-buy" aria-selected="false" data-p="buy">材料採購</button>
@@ -306,6 +307,11 @@ td.pos{color:var(--ok)} td.neg{color:var(--bad)}
     <p class="note">應採購數量＝FG 總顆數 × 每顆用量 ×（1＋損耗率）－現有庫存－已完成成品用掉的數量；算出來小於 0 就是不用買。訂單顆數跟著「FG1E/7E統計」頁，自動更新。</p>
   </section>
 
+  <section role="tabpanel" id="p-short" hidden>
+    <h2>缺料備註 <span class="cust" id="shortN"></span></h2>
+    <div class="tbl"><table><thead><tr><th>品號</th><th>規格說明</th><th>缺料項目</th><th class="r">現有</th><th class="r">需要</th><th class="r">缺少</th><th>用到的訂單（未包數量・預計開包）</th><th>備註</th><th>記錄日</th></tr></thead><tbody id="short"></tbody></table></div>
+    <p class="note">這張表是人工備註，不會影響排程推算。「用到的訂單」依目前排程列出還沒包完、會用到這個品號的訂單。要新增、修改或刪除備註，請告訴 Claude 更新。</p>
+  </section>
   <section role="tabpanel" id="p-cat" hidden>
     <div class="prHead"><h1>合欣電業 品號對照</h1><div id="prMetaCat"></div></div>
     <div class="row noPrint" style="justify-content:space-between"><span><label for="catQ" style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)">搜尋<input type="search" id="catQ" placeholder="品號、規格、品名或條碼" style="width:220px;font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><span class="cust" id="catN"></span></span><button class="btn" id="catPrint" type="button">列印</button></div>
@@ -486,7 +492,7 @@ function renderVar(){
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
 function recompute(){if(!P)return;S=simulate();renderAll()}
-function renderAll(){renderHeader();renderTeam();renderBulb();renderSpec();renderBuy();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();updateFormHint()}
+function renderAll(){renderHeader();renderTeam();renderBulb();renderSpec();renderBuy();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();renderShort();updateFormHint()}
 function renderHeader(){
   const a=asofDate();const inp=$('asof');if(document.activeElement!==inp)inp.value=a;
   const last=entries.map(e=>e.date).sort().pop();const t=today();
@@ -720,6 +726,15 @@ function renderSpec(){
       return`<tr><td class="num">${esc(it)} <span class="cust">${esc(c)}</span></td><td>${esc(nm(c,it))}${r[0].also?`<br><span class="cust">同一包另含 ${esc(r[0].also)}</span>`:''}</td><td>${r[0].loc==='新豐'?'<span class="tag">新豐</span>':'合欣'}</td>${multi?os.map(o=>{const x=r.find(u=>u.order===o.id);return`<td class="r num">${x?fmtN(x.qty):'—'}</td>`}).join(''):''}<td class="r num">${fmtN(q)}</td><td class="r num">×${per}</td><td class="r num"><b>${fmtN(q*per)}</b></td></tr>`}).join('');
     return`<tr style="background:var(--soft)"><td colspan="${cols}" style="font-weight:600">${esc(sp)}</td></tr>`+rows
       +`<tr style="font-weight:600"><td colspan="${cols-1}" style="text-align:right">${esc(sp)} 小計</td><td class="r num">${fmtN(tot(sp))}</td></tr>`}).join('');
+}
+function renderShort(){
+  const L=P.shortages||[];$('shortN').textContent=L.length?`共 ${L.length} 筆`:'';
+  const n=v=>v==null||v===''?'<span class="cust">不詳</span>':fmtN(v)+(typeof v==='number'?'':'');
+  $('short').innerHTML=L.length?L.map(r=>{const c=(P.catalog||[]).find(x=>x.item===r.item)||{};
+    const use=P.items.filter(i=>i.item===r.item&&i.loc==='合欣').map(i=>{const k=i.order+'|'+i.item;const it=S.item[k];if(!it||!(it.rem>0))return null;
+      return`<span class="num">${esc(i.order)}</span>：${fmtN(it.rem)} PCS・${it.first!=null?fd(toT(it.first).d)+' 開包':'—'}`}).filter(Boolean);
+    return`<tr><td class="num">${esc(r.item)}</td><td>${esc(c.spec||c.name||'')}</td><td>${esc(r.what)}</td><td class="r num">${n(r.have)}${r.have!=null&&r.unit?' '+esc(r.unit):''}</td><td class="r num">${n(r.need)}${r.need!=null&&r.unit?' '+esc(r.unit):''}</td><td class="r num">${r.short!=null?`<b style="color:var(--bad)">${fmtN(r.short)}${r.unit?' '+esc(r.unit):''}</b>`:'<span class="tag warn">數目不詳</span>'}</td><td>${use.length?use.join('<br>'):'<span class="cust">目前沒有未包的訂單</span>'}</td><td>${esc(r.note||'')}</td><td>${r.date?fd(r.date):''}</td></tr>`}).join('')
+    :'<tr><td colspan="9" class="empty">目前沒有缺料備註。</td></tr>';
 }
 function renderCat(){
   const cat=P.catalog||[];const q=($('catQ').value||'').trim().toLowerCase();
