@@ -561,7 +561,7 @@ function renderSch(){
 }
 function renderMat(){
   const t=today();
-  const rows=P.items.filter(i=>i.loc==='合欣').map(i=>{const k=i.order+'|'+i.item;const it=S.item[k];const started=(S.pack[k]||0)>0;
+  const rows=P.items.filter(i=>i.loc==='合欣').map(i=>{const k=i.order+'|'+i.item;const it=S.item[k];const started=(S.pack[k]||0)>(i.prev||0);  // prev＝後來加量之前的數量：加出來的那批還沒開包時，要再確認一次到料
     const first=it&&it.first!=null?toT(it.first).d:null;const due=first?prevWd(first):null;return{i,k,first,due,started,m:materials[k.replace('|','_')]}})
     .sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
   $('mat').innerHTML=rows.map(r=>{const arrived=r.started||(r.m&&r.m.arrived);
