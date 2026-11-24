@@ -491,6 +491,11 @@ function renderVar(){
   $('varLathe').innerHTML=lo.length?lo.map(x=>{const d=(x.a-x.p)*(V.per['L|'+x.o.id]||1/V.LR);return`<tr><td class="num">${esc(x.o.id)}</td><td class="r num">${fmtN(x.p)}</td><td class="r num">${fmtN(x.a)}</td><td class="r num ${cls(x.a-x.p,5)}">${sgnN(x.a-x.p)}</td><td class="r num ${cls(d,EPS)}">${sgn(d,2)}</td><td>${stat(d,EPS,' 天')}</td></tr>`}).join('')
     :'<tr><td colspan="6" class="empty">截至這天，原排程還沒有車台工作，也沒有記錄。</td></tr>';
 }
+/* 背景每 20 秒更新會重畫頁面：記住使用者展開／收合的狀態，重畫後維持不變 */
+const openItems=new Set(),closedTeam=new Set();
+document.addEventListener('toggle',e=>{const d=e.target;if(!(d instanceof HTMLDetailsElement)||!d.dataset.o||document.body.classList.contains('pr'))return;
+  if(d.classList.contains('items')){d.open?openItems.add(d.dataset.o):openItems.delete(d.dataset.o)}
+  else if(d.classList.contains('team')){d.open?closedTeam.delete(d.dataset.o):closedTeam.add(d.dataset.o)}},true);
 function recompute(){if(!P)return;S=simulate();renderAll()}
 function renderAll(){renderHeader();renderTeam();renderBulb();renderSpec();renderBuy();renderCat();renderVar();renderOrders();renderLoads();renderEntries();renderDay();renderSch();renderMat();renderShort();updateFormHint()}
 function renderHeader(){
@@ -516,7 +521,7 @@ function renderOrders(){
     <dt>預計包完</dt><dd>${r.fin!=null?ft(r.fin,true):'—'} ${delta}</dd>
     <dt>車台燈泡</dt><dd>${r.fg!=null?'車台預計 '+ft(r.fg,true)+' 做完':'已備齊'}</dd></dl>
     <div><div class="row" style="justify-content:space-between;font-size:13px"><span>已包 <span class="num">${fmtN(r.done)}</span> / <span class="num">${fmtN(r.total)}</span> PCS</span><span class="num">${pct.toFixed(0)}%</span></div><div class="bar" role="img" aria-label="已包 ${pct.toFixed(0)}%"><i style="width:${pct}%"></i></div></div>
-    <details class="items"><summary>各品號（${r.its.length}）</summary><div class="tbl" style="margin-top:8px"><table><thead><tr><th>品號</th><th class="r">已包 / 數量</th><th>預計包完</th></tr></thead><tbody>${rows}</tbody></table></div></details></article>`}).join('');
+    <details class="items" data-o="${esc(o.id)}"${openItems.has(o.id)?' open':''}><summary>各品號（${r.its.length}）</summary><div class="tbl" style="margin-top:8px"><table><thead><tr><th>品號</th><th class="r">已包 / 數量</th><th>預計包完</th></tr></thead><tbody>${rows}</tbody></table></div></details></article>`}).join('');
 }
 function renderLoads(){
   $('loads').innerHTML=PEOPLE.map(w=>{const ts=S.tasks.filter(t=>t.w===w&&t.rem>0);const pd=ts.filter(t=>t.kind==='pack').reduce((s,t)=>s+t.work/480,0);
@@ -596,7 +601,7 @@ function renderTeam(){
     const by={};for(const t of src){const r=by[t.item]=by[t.item]||{item:t.item,how:t.how,q:0,rem:0,who:new Set(),st:null,en:null};r.q+=t.qty;r.rem+=t.rem;r.who.add(t.w);if(t.rem>0){r.st=r.st==null?t.st:Math.min(r.st,t.st);r.en=r.en==null?t.en:Math.max(r.en,t.en)}}
     const rows=Object.values(by).sort((a,b)=>(a.en??Infinity)-(b.en??Infinity)||a.item.localeCompare(b.item));
     const dq=rows.reduce((x,r)=>x+r.q,0),dr=rows.reduce((x,r)=>x+r.rem,0),dfs=rows.filter(r=>r.en!=null).map(r=>r.en),df=dfs.length?Math.max(...dfs):null;
-    dets.push(`<details class="team" open><summary><b class="num">${esc(o.id)}</b><span class="cust">${esc(o.cust)}</span><span>${withFa?'含芳 ':'團隊 '}${rows.length} 個品號・${fmtN(dq)} PCS・剩 ${fmtN(dr)}</span><span>最後一包 <b class="num">${df!=null?ft(df,true):'已包完'}</b></span>${bufTag(df,o)}</summary>
+    dets.push(`<details class="team" data-o="${esc(o.id)}"${closedTeam.has(o.id)?'':' open'}><summary><b class="num">${esc(o.id)}</b><span class="cust">${esc(o.cust)}</span><span>${withFa?'含芳 ':'團隊 '}${rows.length} 個品號・${fmtN(dq)} PCS・剩 ${fmtN(dr)}</span><span>最後一包 <b class="num">${df!=null?ft(df,true):'已包完'}</b></span>${bufTag(df,o)}</summary>
       <div class="tbl"><table><thead><tr><th>品號</th><th>規格／品名</th><th>包裝方式</th><th>負責</th><th class="r">目標</th><th class="r">已包</th><th class="r">剩餘</th><th>開始</th><th>完成</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="num">${esc(r.item)}</td><td>${esc(nm(r.item))}</td><td>${esc(r.how)}</td><td>${[...r.who].map(esc).join('、')}</td><td class="r num">${fmtN(r.q)}</td><td class="r num">${fmtN(r.q-r.rem)}</td><td class="r num">${fmtN(r.rem)}</td><td class="num">${r.st!=null?ft(r.st):'—'}</td><td class="num">${r.en!=null?ft(r.en,true):'<span class="tag ok">已包完</span>'}</td></tr>`).join('')}</tbody></table></div></details>`);
   }
   $('teamSum').innerHTML=sums.join('');$('teamDetail').innerHTML=dets.join('');
