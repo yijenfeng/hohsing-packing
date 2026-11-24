@@ -56,7 +56,8 @@ h2{font-size:16px;margin:0;font-weight:700}
 .banner.info{background:var(--accent-soft);border-color:var(--accent)}
 .num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
 /* order cards */
-.orders{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.orders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:700px){.orders{grid-template-columns:1fr}}
 .ord{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .ord-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .ord-h b{font-size:17px}
